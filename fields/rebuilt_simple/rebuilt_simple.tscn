@@ -1,0 +1,85 @@
+[gd_scene load_steps=28 format=3 uid="uid://ct7c1sjiwofir"]
+
+[ext_resource type="PackedScene" uid="uid://b5ph4wspeeq1l" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- ALLIANCE STATION, BLUE 1 & 2.gltf" id="1_nnk8s"]
+[ext_resource type="PackedScene" uid="uid://c8mdm4iuqvkq4" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- ALLIANCE STATION, BLUE 3.gltf" id="2_4455k"]
+[ext_resource type="PackedScene" uid="uid://cdm3ad5y2q6my" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- ALLIANCE STATION, BLUE CORNER UPRIGHT.gltf" id="3_01fnl"]
+[ext_resource type="PackedScene" uid="uid://cqyowugjyelw" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- ALLIANCE STATION, RED 1 & 2.gltf" id="4_jono7"]
+[ext_resource type="PackedScene" uid="uid://cektuc03yxy3j" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- ALLIANCE STATION, RED 3.gltf" id="5_8lycd"]
+[ext_resource type="PackedScene" uid="uid://ujyj5ignjvsm" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- ALLIANCE STATION, RED CORNER UPRIGHT.gltf" id="6_sapsc"]
+[ext_resource type="PackedScene" uid="uid://5v0udhlcivi6" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- BUMP, BLUE, AUDIENCE.gltf" id="7_ww6vk"]
+[ext_resource type="PackedScene" uid="uid://d07sfp88ok1h4" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- BUMP, BLUE, SCORING TABLE.gltf" id="8_n03ac"]
+[ext_resource type="PackedScene" uid="uid://chpmyta5g5hbs" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- BUMP, RED, AUDIENCE.gltf" id="9_ghqgy"]
+[ext_resource type="PackedScene" uid="uid://bhcxivtc6ra4x" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- BUMP, RED, SCORING TABLE.gltf" id="10_cpv1x"]
+[ext_resource type="PackedScene" uid="uid://bek2e48mo8wvx" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- CARPET.gltf" id="11_r7wdm"]
+[ext_resource type="PackedScene" uid="uid://cp0hdvulfm6w8" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- DEPOT, BLUE.gltf" id="12_7j04u"]
+[ext_resource type="PackedScene" uid="uid://ckyt6uo0a2cys" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- DEPOT, RED.gltf" id="13_8cm16"]
+[ext_resource type="PackedScene" uid="uid://c3os8j616j30t" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- HUB, BLUE.gltf" id="14_khpk2"]
+[ext_resource type="PackedScene" uid="uid://cml047ogw4o8t" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- HUB, RED.gltf" id="15_2jvdn"]
+[ext_resource type="PackedScene" uid="uid://lxd0lvfeqaj" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- OUTPOST, BLUE.gltf" id="16_17jop"]
+[ext_resource type="PackedScene" uid="uid://dq0bt1o53hx8t" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- OUTPOST, RED.gltf" id="17_qy6qy"]
+[ext_resource type="PackedScene" uid="uid://byry1tgycuy3q" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- SIDE WALL, AUDIENCE.gltf" id="18_txbrx"]
+[ext_resource type="PackedScene" uid="uid://by2qg786xp7ku" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- SIDE WALL, SCORING TABLE.gltf" id="19_fuwpm"]
+[ext_resource type="PackedScene" uid="uid://b7ttbjvm23e5j" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- TOWER, BLUE.gltf" id="20_7m7xe"]
+[ext_resource type="PackedScene" uid="uid://bcr8j2mwh23vo" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- TOWER, RED.gltf" id="21_55bi5"]
+[ext_resource type="PackedScene" uid="uid://c5cff288yhual" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- TRENCH, FIXED, BLUE.gltf" id="22_qoo7r"]
+[ext_resource type="PackedScene" uid="uid://dpoopcypwnxo8" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- TRENCH, FIXED, RED.gltf" id="23_34hkp"]
+[ext_resource type="PackedScene" uid="uid://c8v05cb0cmjev" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- TRENCH, HINGED ARM, BLUE.gltf" id="24_3j6r6"]
+[ext_resource type="PackedScene" uid="uid://b3dt10d02fu8d" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- TRENCH, HINGED ARM, RED.gltf" id="25_kamta"]
+[ext_resource type="PackedScene" uid="uid://fjnve2stx1s5" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- TRENCH, HINGED BASE, BLUE.gltf" id="26_6ay3l"]
+[ext_resource type="PackedScene" uid="uid://b6apsdnwkq8s8" path="res://fields/rebuilt_simple/assets/BLOCK CAD FIELD - BLOCK CAD- TRENCH, HINGED BASE, RED.gltf" id="27_fna6w"]
+
+[node name="RebuiltSimple" type="Node3D"]
+
+[node name="Root" parent="." instance=ExtResource("1_nnk8s")]
+
+[node name="Root2" parent="." instance=ExtResource("2_4455k")]
+
+[node name="Root3" parent="." instance=ExtResource("3_01fnl")]
+
+[node name="Root4" parent="." instance=ExtResource("4_jono7")]
+
+[node name="Root5" parent="." instance=ExtResource("5_8lycd")]
+
+[node name="Root6" parent="." instance=ExtResource("6_sapsc")]
+
+[node name="Root7" parent="." instance=ExtResource("7_ww6vk")]
+
+[node name="Root8" parent="." instance=ExtResource("8_n03ac")]
+
+[node name="Root9" parent="." instance=ExtResource("9_ghqgy")]
+
+[node name="Root10" parent="." instance=ExtResource("10_cpv1x")]
+
+[node name="Root11" parent="." instance=ExtResource("11_r7wdm")]
+
+[node name="Root12" parent="." instance=ExtResource("12_7j04u")]
+
+[node name="Root13" parent="." instance=ExtResource("13_8cm16")]
+
+[node name="Root14" parent="." instance=ExtResource("14_khpk2")]
+
+[node name="Root15" parent="." instance=ExtResource("15_2jvdn")]
+
+[node name="Root16" parent="." instance=ExtResource("16_17jop")]
+
+[node name="Root17" parent="." instance=ExtResource("17_qy6qy")]
+
+[node name="Root18" parent="." instance=ExtResource("18_txbrx")]
+
+[node name="Root19" parent="." instance=ExtResource("19_fuwpm")]
+
+[node name="Root20" parent="." instance=ExtResource("20_7m7xe")]
+
+[node name="Root21" parent="." instance=ExtResource("21_55bi5")]
+
+[node name="Root22" parent="." instance=ExtResource("22_qoo7r")]
+
+[node name="Root23" parent="." instance=ExtResource("23_34hkp")]
+
+[node name="Root24" parent="." instance=ExtResource("24_3j6r6")]
+
+[node name="Root25" parent="." instance=ExtResource("25_kamta")]
+
+[node name="Root26" parent="." instance=ExtResource("26_6ay3l")]
+
+[node name="Root27" parent="." instance=ExtResource("27_fna6w")]

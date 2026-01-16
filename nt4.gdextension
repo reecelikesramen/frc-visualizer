@@ -1,0 +1,20 @@
+[configuration]
+entry_symbol = "nt_library_init"
+compatibility_minimum = "4.2"
+
+[libraries]
+# MacOS: Define both generic and specific architectures
+macos.debug = "res://bin/libnt4_gdext.dylib"
+macos.release = "res://bin/libnt4_gdext.dylib"
+macos.debug.arm64 = "res://bin/libnt4_gdext.dylib"
+macos.release.arm64 = "res://bin/libnt4_gdext.dylib"
+
+# Windows
+windows.debug.x86_64 = "res://bin/nt4_gdext.dll"
+windows.release.x86_64 = "res://bin/nt4_gdext.dll"
+
+# Linux
+linux.debug.x86_64 = "res://bin/libnt4_gdext.so"
+linux.release.x86_64 = "res://bin/libnt4_gdext.so"
+linux.debug.arm64 = "res://bin/libnt4_gdext.so"
+linux.release.arm64 = "res://bin/libnt4_gdext.so"

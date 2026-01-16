@@ -1,0 +1,37 @@
+[gd_scene load_steps=5 format=3 uid="uid://b37igovglwinu"]
+
+[ext_resource type="PackedScene" uid="uid://cbfhfk2kvrvni" path="res://fields/rebuilt/assets/rebuilt_import.scn" id="1_ig7tw"]
+[ext_resource type="Script" uid="uid://qj1ggyeay5gh" path="res://test_nt4.gd" id="2_0xm2m"]
+[ext_resource type="PackedScene" uid="uid://b8x6c8x7eax0" path="res://NTTreeView.tscn" id="3_h2yge"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_0xm2m"]
+size = Vector3(0.699, 0.762, 0.699)
+
+[node name="Node3D" type="Node3D"]
+
+[node name="model" parent="." instance=ExtResource("1_ig7tw")]
+transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, -4.0324006, 0, -8.255458)
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(-0.99635875, 0.0034647742, -0.08518996, -0.018174686, 0.96757776, 0.25191867, 0.083300754, 0.25254968, -0.9639915, -2.0244346, 5.2732444, -12.241826)
+
+[node name="Node" type="Node" parent="."]
+
+[node name="Node3D" type="Node3D" parent="."]
+script = ExtResource("2_0xm2m")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Node3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.381, 0)
+mesh = SubResource("BoxMesh_0xm2m")
+skeleton = NodePath("../..")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.969132, 0.044412516, 0.24250908, -0.24654238, 0.17458092, 0.95327777, 0, -0.9836408, 0.18014154, 0, 5.921615, 0)
+light_energy = 5.0
+shadow_enabled = true
+
+[node name="NTTreeView" parent="." instance=ExtResource("3_h2yge")]
+offset_left = 318.0
+offset_top = 382.0
+offset_right = 318.0
+offset_bottom = 382.0
