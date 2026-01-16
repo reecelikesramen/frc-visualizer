@@ -26,6 +26,8 @@ static func parse_packet(data: PackedByteArray, schema_type: String) -> Variant:
 		return parse_rotation3d(data)
 	elif schema_type == "struct:Rotation2d":
 		return parse_rotation2d(data)
+	elif schema_type == "struct:ChassisSpeeds":
+		return parse_chassis_speeds(data)
 		
 	return "Raw Data (" + str(data.size()) + " bytes)"
 
@@ -52,6 +54,7 @@ static func get_struct_size(type: String) -> int:
 		"struct:Rotation3d": return 32
 		"struct:Rotation2d": return 8
 		"struct:SwerveModuleState": return 16
+		"struct:ChassisSpeeds": return 24
 	return 0
 
 static func parse_pose3d(data: PackedByteArray) -> Variant:
@@ -104,6 +107,18 @@ static func parse_swerve_module_state(data: PackedByteArray) -> Dictionary:
 		"_type": "SwerveModuleState"
 	}
 
+static func parse_chassis_speeds(data: PackedByteArray) -> Dictionary:
+	if data.size() < 24: return {}
+	var vx = data.decode_double(0)
+	var vy = data.decode_double(8)
+	var omega = data.decode_double(16)
+	return {
+		"vx": vx,
+		"vy": vy,
+		"omega": omega,
+		"_type": "ChassisSpeeds"
+	}
+
 # --- Formatting ---
 
 static func format_value(val: Variant, short: bool = false) -> String:
@@ -115,8 +130,18 @@ static func format_value(val: Variant, short: bool = false) -> String:
 			
 			if type == "SwerveModuleState":
 				return "Spd: %.2f m/s, Ang: %.2f rad" % [val.get("speed", 0), val.get("angle", 0)]
+			if type == "ChassisSpeeds":
+				return "vx: %.2f, vy: %.2f, ohm: %.2f" % [val.get("vx", 0), val.get("vy", 0), val.get("omega", 0)]
 			if type == "Quaternion":
-				return "Quat(%.2f, %.2f, %.2f, %.2f)" % [val["x"], val["y"], val["z"], val["w"]]
+				# Convert Godot -> FRC Mapping for display: (-y, z, -x, w)
+				# But wait, raw Quaternion from struct parse is ALREADY in Godot coords.
+				# FRC(x, y, z, w) -> Godot(-y, z, -x, w)
+				# So Inverse: 
+				# FRC_x = -Godot_z
+				# FRC_y = -Godot_x
+				# FRC_z = Godot_y
+				# FRC_w = Godot_w
+				return "Quat(%.2f, %.2f, %.2f, %.2f)" % [-val["z"], -val["x"], val["y"], val["w"]]
 			if type == "Euler":
 				return "RPY(%.1f, %.1f, %.1f)" % [val["roll"], val["pitch"], val["yaw"]]
 				
@@ -130,12 +155,16 @@ static func format_value(val: Variant, short: bool = false) -> String:
 				if typeof(first) == TYPE_TRANSFORM2D: return "Pose2d[%d]" % val.size()
 				if typeof(first) == TYPE_DICTIONARY and first.get("_type") == "SwerveModuleState":
 					return "SwerveState[%d]" % val.size()
+				if typeof(first) == TYPE_DICTIONARY and first.get("_type") == "ChassisSpeeds":
+					return "ChassisSpeeds[%d]" % val.size()
 				return "Array[%d]" % val.size()
 			else:
 				if typeof(first) == TYPE_TRANSFORM3D: return "Pose3d[%d]" % val.size()
 				if typeof(first) == TYPE_TRANSFORM2D: return "Pose2d[%d]" % val.size()
 				if typeof(first) == TYPE_DICTIONARY and first.get("_type") == "SwerveModuleState":
 					return "SwerveState[%d]" % val.size()
+				if typeof(first) == TYPE_DICTIONARY and first.get("_type") == "ChassisSpeeds":
+					return "ChassisSpeeds[%d]" % val.size()
 
 		return "Array[%d]" % val.size()
 
@@ -144,9 +173,16 @@ static func format_value(val: Variant, short: bool = false) -> String:
 		
 	elif typeof(val) == TYPE_TRANSFORM3D:
 		if short: return "Pose3d"
+		# Convert to FRC
 		var o = val.origin
+		var frc_x = -o.z
+		var frc_y = -o.x
+		var frc_z = o.y
+		
+		# For Rotation, we convert the basis to Quaternion then map, or just Euler 
+		# But usually people want Translation + Rotation
 		var r = val.basis.get_euler()
-		return "Pose(%.2f, %.2f, %.2f) YPR: %.2f, %.2f, %.2f" % [o.x, o.y, o.z, rad_to_deg(r.y), rad_to_deg(r.x), rad_to_deg(r.z)]
+		return "Pose(%.2f, %.2f, %.2f) YPR: %.2f, %.2f, %.2f" % [frc_x, frc_y, frc_z, rad_to_deg(r.y), rad_to_deg(r.x), rad_to_deg(r.z)]
 		
 	elif typeof(val) == TYPE_TRANSFORM2D:
 		if short: return "Pose2d"
@@ -156,7 +192,12 @@ static func format_value(val: Variant, short: bool = false) -> String:
 		
 	elif typeof(val) == TYPE_VECTOR3:
 		if short: return "Translation3d"
-		return "(%.2f, %.2f, %.2f)" % [val.x, val.y, val.z]
+		# Godot -> FRC
+		var frc_x = -val.z
+		var frc_y = -val.x
+		var frc_z = val.y
+		var fmt = "%.4f" if short else "%.2f"
+		return ("(" + fmt + ", " + fmt + ", " + fmt + ")") % [frc_x, frc_y, frc_z]
 		
 	elif typeof(val) == TYPE_VECTOR2:
 		if short: return "Translation2d"
@@ -164,7 +205,12 @@ static func format_value(val: Variant, short: bool = false) -> String:
 		
 	elif typeof(val) == TYPE_QUATERNION:
 		if short: return "Rotation3d"
-		return "Quat(%.2f, %.2f, %.2f, %.2f)" % [val.x, val.y, val.z, val.w]
+		# Godot -> FRC
+		var frc_x = -val.z
+		var frc_y = -val.x
+		var frc_z = val.y
+		var frc_w = val.w
+		return "Quat(%.2f, %.2f, %.2f, %.2f)" % [frc_x, frc_y, frc_z, frc_w]
 	
 	return str(val)
 
@@ -173,14 +219,28 @@ static func format_value(val: Variant, short: bool = false) -> String:
 static func to_dictionary(val: Variant) -> Variant:
 	if typeof(val) == TYPE_TRANSFORM3D:
 		var o = val.origin
-		# Use vectors, but tag them so we can display them nicely
-		var trans = { "x": o.x, "y": o.y, "z": o.z, "_type": "Translation3d" }
+		# Godot -> FRC Logic in Dictionary?
+		# The dictionary is used for the Tree View expansion. 
+		# If the user wants to see FRC coords IN THE EXPANDED ITEMS, we should convert here.
+		
+		var frc_x = -o.z
+		var frc_y = -o.x
+		var frc_z = o.y
+		
+		var trans = { "x": frc_x, "y": frc_y, "z": frc_z, "_type": "Translation3d" }
 		
 		# Rotation breakdown
 		var r = val.basis.get_euler()
 		var q = val.basis.get_rotation_quaternion()
+		
+		# Convert Quat
+		var frc_qx = -q.z
+		var frc_qy = -q.x
+		var frc_qz = q.y 
+		var frc_qw = q.w
+		
 		var rot = {
-			"Quaternion": { "x": q.x, "y": q.y, "z": q.z, "w": q.w, "_type": "Quaternion" },
+			"Quaternion": { "x": frc_qx, "y": frc_qy, "z": frc_qz, "w": frc_qw, "_type": "Quaternion" },
 			"Euler": { "roll": rad_to_deg(r.x), "pitch": rad_to_deg(r.y), "yaw": rad_to_deg(r.z), "_type": "Euler" },
 			"_type": "Rotation3d"
 		}
@@ -199,13 +259,23 @@ static func to_dictionary(val: Variant) -> Variant:
 			"_type": "Pose2d"
 		}
 	elif typeof(val) == TYPE_VECTOR3:
-		return { "x": val.x, "y": val.y, "z": val.z, "_type": "Translation3d" }
+		# Godot -> FRC
+		var frc_x = -val.z
+		var frc_y = -val.x
+		var frc_z = val.y
+		return { "x": frc_x, "y": frc_y, "z": frc_z, "_type": "Translation3d" }
 	elif typeof(val) == TYPE_VECTOR2:
 		return { "x": val.x, "y": val.y, "_type": "Translation2d" }
 	elif typeof(val) == TYPE_QUATERNION:
 		var r = val.get_euler()
+		
+		var frc_qx = -val.z
+		var frc_qy = -val.x
+		var frc_qz = val.y 
+		var frc_qw = val.w
+		
 		return {
-			"Quaternion": { "x": val.x, "y": val.y, "z": val.z, "w": val.w, "_type": "Quaternion" },
+			"Quaternion": { "x": frc_qx, "y": frc_qy, "z": frc_qz, "w": frc_qw, "_type": "Quaternion" },
 			"Euler": { "roll": rad_to_deg(r.x), "pitch": rad_to_deg(r.y), "yaw": rad_to_deg(r.z), "_type": "Euler" },
 			"_type": "Rotation3d"
 		}

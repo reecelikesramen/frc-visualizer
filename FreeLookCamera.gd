@@ -38,6 +38,9 @@ func _input(event):
 
 func _process(delta):
 	# Movement
+	if get_viewport().gui_get_focus_owner() != null:
+		return
+
 	var input_dir = Vector3.ZERO
 	
 	# Only move if right click is held? Standard editor usually allows movement anytime or only when focused.
@@ -68,6 +71,10 @@ func _process(delta):
 
 func _unhandled_input(event):
 	if event is InputEventMouseButton:
+		# Prevent scroll zoom if mouse is over a UI element
+		if get_viewport().gui_get_hovered_control() != null:
+			return
+
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			translate_object_local(Vector3(0, 0, -1)) # Forward
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:

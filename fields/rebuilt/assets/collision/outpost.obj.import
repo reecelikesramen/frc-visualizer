@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cty83fq7kfssq"
+path="res://.godot/imported/outpost.obj-732a7d2776155c4e820864da98107dcc.mesh"
+
+[deps]
+
+files=["res://.godot/imported/outpost.obj-732a7d2776155c4e820864da98107dcc.mesh"]
+
+source_file="res://fields/rebuilt/assets/collision/outpost.obj"
+dest_files=["res://.godot/imported/outpost.obj-732a7d2776155c4e820864da98107dcc.mesh", "res://.godot/imported/outpost.obj-732a7d2776155c4e820864da98107dcc.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

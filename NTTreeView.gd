@@ -62,6 +62,11 @@ func _ready():
 	tuning_root_item.set_text(0, "Tuning")
 	tuning_root_item.set_selectable(0, false)
 	tuning_map[""] = tuning_root_item # Root of tuning
+	
+	# Default hidden? Or we just rely on _refresh_tree to show it/populate it?
+	# Items in Tree don't have "visible" property easily, but we can remove/add it.
+	# Actually, TreeItem DOES have visible.
+	tuning_root_item.visible = false
 
 func set_paths_to_expand(paths: Array[String]):
 	for p in paths:
@@ -134,11 +139,19 @@ func _refresh_tree():
 		
 		# 2. Tuning Mirror
 		if topic_name.begins_with("/AdvantageKit/NetworkInputs/Tuning/"):
+			# Enable the tuning root if we see any tuning topic
+			if tuning_root_item:
+				tuning_root_item.visible = true
+				
 			var rel_path = topic_name.replace("/AdvantageKit/NetworkInputs/Tuning/", "")
 			var tuning_item = _get_or_create_tuning_item(rel_path)
 			
 			tuning_item.set_metadata(0, topic_name) 
 			_update_item_value(tuning_item, topic_name, topic_type, true, "")
+		
+		# Also check if the raw input topic exists to enable the folder?
+		if topic_name == "/AdvantageKit/NetworkInputs/Tuning": 
+			if tuning_root_item: tuning_root_item.visible = true
 
 func _update_item_value(item: TreeItem, topic_name: String, topic_type: String, editable: bool, struct_subpath: String):
 	var raw_val = null
@@ -158,7 +171,7 @@ func _update_item_value(item: TreeItem, topic_name: String, topic_type: String, 
 			val_str = "struct..."
 	elif topic_type == "double" or topic_type == "float":
 		raw_val = nt.get_number(topic_name, 0.0)
-		val_str = "%.3f" % raw_val
+		val_str = "%.4f" % raw_val
 	elif topic_type == "boolean":
 		raw_val = nt.get_boolean(topic_name, false)
 		val_str = str(raw_val)

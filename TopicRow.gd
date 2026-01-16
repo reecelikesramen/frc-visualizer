@@ -1,14 +1,21 @@
-extends HBoxContainer
+extends VBoxContainer
 
 var topic_path: String = ""
 var topic_type: String = ""
 var nt_instance = null
 
-@onready var icon_rect: TextureRect = $Icon
-@onready var name_label: Label = $NameLabel
-@onready var value_label: Label = $ValueLabel
-@onready var path_label: Label = $PathLabel
-@onready var close_button: Button = $CloseButton
+@onready var icon_rect: TextureRect = $TopBar/Icon
+@onready var name_label: Label = $TopBar/NameLabel
+@onready var value_label: Label = $TopBar/ValueLabel
+@onready var path_label: Label = $TopBar/PathLabel
+@onready var close_button: Button = $TopBar/CloseButton
+@onready var children_container: VBoxContainer = $MarginContainer/ChildrenContainer
+@onready var highlight_rect = $HighlightRect # Added via code/edit separately or expected
+
+# Hierarchy
+var parent_row = null # If nested
+var row_data = {} # {path, type, etc} for drag data
+var is_drag_highlighted = false
 
 func setup(path: String, type: String, nt: Node):
 	topic_path = path
@@ -27,6 +34,84 @@ func setup(path: String, type: String, nt: Node):
 	
 	# Set tooltip
 	tooltip_text = path
+	
+	row_data = {
+		"path": topic_path,
+		"type": "nt_topic",
+		"nt_type": topic_type,
+		"nt_ref": nt_instance
+	}
+
+# --- Drag & Drop ---
+
+func _get_drag_data(at_position):
+	var preview = Label.new()
+	preview.text = topic_path
+	set_drag_preview(preview)
+	
+	# If we are dragging, we might be dragging THIS whole tree.
+	# Return self reference or data struct? Data struct is safer for cross-dock.
+	# But we need to move the node.
+	row_data["source_node"] = self
+	return row_data
+
+func _can_drop_data(at_position, data):
+	if typeof(data) == TYPE_DICTIONARY and data.get("type") == "nt_topic":
+		var source_node = data.get("source_node")
+		if source_node == self: return false # Can't drop on self
+		
+		# Allow universal nesting for now as discussed
+		
+		# Show Highlight
+		_set_drag_highlight(true)
+		return true
+	return false
+
+func _drop_data(at_position, data):
+	_set_drag_highlight(false)
+	
+	# Calculate drop zone
+	# If dropped on the TopBar -> Nest
+	# If dropped on ChildrenContainer area -> Reorder children?
+	# But mostly we drop ON the row to nest.
+	
+	var source_node = data.get("source_node")
+	if not is_instance_valid(source_node): return
+	
+	# If source is already our child, we might be reordering? 
+	# Let's keep simple: Drop on this row = Nest inside this row.
+	
+	print("Nesting ", source_node.topic_path, " under ", topic_path)
+	
+	# Reparent
+	if source_node.get_parent():
+		source_node.get_parent().remove_child(source_node)
+		
+	children_container.add_child(source_node)
+	source_node.parent_row = self
+	
+	# Update indentation/visuals?
+	# VBox handles layout. We might want a margin.
+	# For now standard VBox.
+	
+	# Notify dock of structure change
+	get_tree().call_group("dock_updates", "_notify_change")
+
+func _notification(what):
+	if what == NOTIFICATION_MOUSE_EXIT:
+		_set_drag_highlight(false)
+	elif what == NOTIFICATION_DRAG_END:
+		_set_drag_highlight(false)
+
+func _set_drag_highlight(enabled: bool):
+	if is_drag_highlighted == enabled: return
+	is_drag_highlighted = enabled
+	if highlight_rect:
+		highlight_rect.visible = enabled
+	else:
+		# Fallback if node missing?
+		modulate = Color(1.2, 1.2, 1.2) if enabled else Color(1, 1, 1)
+
 
 func _process(_delta):
 	if nt_instance and topic_path != "":
@@ -37,14 +122,9 @@ func _process(_delta):
 		# Better: Check if the value returned is "non-empty/non-default" or if we use get_topic_info check occasionally.
 		# For efficiency, let's just assume if get_value returns default it might be missing, 
 		# OR we can assume if it's not in the tree it doesn't exist.
-		
 		# Let's check `nt_instance.get_topic_info`? No that's expensive every frame.
 		# NT4 lib usually returns 0/default if missing.
 		# Let's just modify visual based on value.
-		
-		var val = _fetch_value()
-		value_label.text = val
-		
 		# Basic liveness check: If we have a standard default value and it never changes, it might be missing.
 		# But better, if the tree refreshes, we know what topics exist.
 		# But `TopicRow` doesn't have access to the Tree.
@@ -52,15 +132,20 @@ func _process(_delta):
 		# If we want "missing topic" (e.g. robot offline or code changed), 
 		# we'd need to poll `nt.get_topic_info()` occasionally. 
 		# Let's do a loose check: if value is empty/default, dim it.
-		
 		# Actually, user requirement: "add an X symbol and a muted text or strikethrough"
 		# To strictly know if it "no longer exists", we need to know the list of ALL topics.
 		# Let's have TopicDock pass the "known_topics" set to rows? 
 		# Or have TopicRow poll `nt_instance` occasionally?
-		
 		# Let's skip complex polling for now and just set text. 
 		# If we really want to support 'missing' properly we need the list of topics.
-		pass
+		var val = _fetch_value()
+		value_label.text = val
+		
+		# Basic check
+		if val == "...":
+			_set_params(true)
+		else:
+			_set_params(false)
 
 func _fetch_value() -> String:
 	# Check for Structs
@@ -79,7 +164,7 @@ func _fetch_value() -> String:
 	# For primitives, hard to distinguish 0.0 from missing.
 	# But we can assume if we are getting updates it works.
 	if topic_type == "double" or topic_type == "float":
-		return "%.3f" % nt_instance.get_number(topic_path, 0.0)
+		return "%.2f" % nt_instance.get_number(topic_path, 0.0)
 	elif topic_type == "int":
 		return str(int(nt_instance.get_number(topic_path, 0.0)))
 	elif topic_type == "boolean":
@@ -106,6 +191,8 @@ func _set_params(missing: bool):
 	else:
 		modulate.a = 1.0
 
+signal visualization_requested(path: String, type: String, viz_type: String)
+
 func _ready():
 	# Setup icon input
 	icon_rect.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -120,18 +207,35 @@ func _show_context_menu():
 	popup.add_item("Visualize as Text (Default)", 0)
 	
 	if topic_type == "struct:Pose3d":
-		popup.add_item("Visualize as Robot", 1)
-		popup.add_item("Visualize as Arrow", 2)
+		popup.add_separator()
+		popup.add_item("Visualize as Robot", 100)
+		popup.add_item("Visualize as Arrow", 101)
+	elif topic_type == "struct:Pose3d[]":
+		popup.add_separator()
+		popup.add_item("Visualize as Game Pieces", 200)
+	elif topic_type == "struct:SwerveModuleState[]":
+		popup.add_separator()
+		popup.add_item("Visualize as Swerve States", 300)
 		
+	# Simple disconnect checking to avoid duplicate connections if this is called multiple times?
+	# Popup is new instance every time, so it's fine.
 	popup.id_pressed.connect(_on_context_menu_item_selected)
 	add_child(popup)
 	popup.position = get_global_mouse_position()
 	popup.show()
 
 func _on_context_menu_item_selected(id):
-	# Handle selection
-	print("Selected visualization: ", id)
-	# Todo: Implement actual visualization switching
+	match id:
+		100:
+			visualization_requested.emit(topic_path, topic_type, "robot")
+		101:
+			visualization_requested.emit(topic_path, topic_type, "arrow")
+		200:
+			visualization_requested.emit(topic_path, topic_type, "game_pieces")
+		300:
+			visualization_requested.emit(topic_path, topic_type, "swerve_states")
+		_:
+			print("Selected visualization id: ", id)
 	
 func _on_close_button_pressed():
 	queue_free()
