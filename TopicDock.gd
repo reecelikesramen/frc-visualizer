@@ -23,6 +23,13 @@ func set_nt_instance(nt_node):
 
 func _can_drop_data(at_position, data):
 	if typeof(data) == TYPE_DICTIONARY and data.has("type") and data["type"] == "nt_topic":
+		var nt_type = data.get("nt_type", "")
+		# Only allow drop if we have compatible visualizers
+		# (Checking only Top Level compatibility for drag-drop to root? 
+		# Or generic compatibility. User said "Only topics that are true for these supplied predicates")
+		# We check if *any* visualizer exists for this type.
+		if VisualizerRegistry.get_compatible_visualizers(nt_type).is_empty():
+			return false
 		return true
 	return false
 
@@ -36,9 +43,6 @@ func _drop_data(at_position, data):
 		var source_node = data.get("source_node")
 		if is_instance_valid(source_node) and source_node.get("topic_path") == path:
 			# It's an existing node from our dock.
-			# If we drop here (onto the main list area), we might mean "move to root".
-			# But TopicRow handles drops ON rows (nesting).
-			# So dropping here means "Root".
 			if source_node.get_parent():
 				source_node.get_parent().remove_child(source_node)
 			
@@ -53,6 +57,7 @@ func _drop_data(at_position, data):
 			
 		add_topic(path, type, nt_ref)
 		_notify_change()
+
 
 func add_topic(path: String, type: String, nt_ref: Node):
 	# Check for duplicates
@@ -75,6 +80,11 @@ func add_topic(path: String, type: String, nt_ref: Node):
 
 func _on_visualization_requested(path: String, type: String, viz_type: String):
 	print("TopicDock: Viz requested for ", path, " as ", viz_type)
+	if viz_type == "none":
+		remove_visualizer(path)
+		_notify_change()
+		return
+		
 	if active_visualizers.has(path):
 		var current = active_visualizers[path]["type"]
 		remove_visualizer(path)
@@ -83,15 +93,15 @@ func _on_visualization_requested(path: String, type: String, viz_type: String):
 			_notify_change()
 			return
 
-	add_visualizer(path, viz_type)
+	add_visualizer(path, viz_type, type)
 	_notify_change()
 
-func add_visualizer(path: String, viz_type: String):
+func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 	if not nt_instance_ref:
 		push_warning("TopicDock: Cannot add visualizer, NT instance not set")
 		return
 
-	# Find or Create 'RobotParent'
+	# 1. Resolve Parent
 	var main = OwnerUtils.get_main(self)
 	var parent = main.get_node_or_null("RobotParent")
 	if not parent:
@@ -99,75 +109,87 @@ func add_visualizer(path: String, viz_type: String):
 		parent.name = "RobotParent"
 		main.add_child(parent)
 
-	var viz_node = null
-	if viz_type == "robot":
-		viz_node = Node3D.new()
-		viz_node.set_script(load("res://visualizers/RobotVisualizer.gd"))
-		# Add default debug mesh since we don't have a specific robot asset selector yet
-		var mesh_inst = MeshInstance3D.new()
-		mesh_inst.mesh = BoxMesh.new()
-		mesh_inst.mesh.size = Vector3(0.5, 0.5, 0.5)
-		viz_node.add_child(mesh_inst)
-		var context = {
-			"topic_type": "struct:Pose3d", # Or generic
-			"viz_type": viz_type,
-			"parent_viz_type": "root",
-			"parent_node": null
-		}
-		
-		# CHECK FOR PARENTING
-		# We need to find the TopicRow for this path and see if it has a parent row
-		var row_node = _find_row_by_path(path, container)
-		if row_node and row_node.get("parent_row"):
-			var parent_row = row_node.parent_row
-			var p_path = parent_row.topic_path
-			if active_visualizers.has(p_path):
-				var p_viz_info = active_visualizers[p_path]
-				var p_node = p_viz_info["node"]
-				if is_instance_valid(p_node):
-					parent = p_node
-					context["parent_viz_type"] = p_viz_info["type"]
-					context["parent_node"] = p_node
-					print("TopicDock: Parenting ", path, " viz to ", p_path, " viz")
+	var context = {
+		"viz_type": viz_type,
+		"topic_type": nt_type,
+		"parent_viz_type": "root",
+		"parent_node": null
+	}
 
-		if viz_node.has_method("setup"):
-			# Check setup signature count? Or just try passing context.
-			# GDScript doesn't crash on extra args if using call? No, it does.
-			# But we can assume we updated visualizers or they use varargs. 
-			# User request implies visualizer SHOULD get this.
-			# Let's try passing 3 args.
-			viz_node.setup(nt_instance_ref, path, context)
-			
-	elif viz_type == "game_pieces":
-		# Context for game pieces
-		var context = {"viz_type": viz_type}
-		viz_node = MultiMeshInstance3D.new()
-		viz_node.set_script(load("res://visualizers/GamePieceVisualizer.gd"))
-		if viz_node.has_method("setup"):
-			viz_node.setup(nt_instance_ref, path, context)
+	# Check for hierarchy nesting in the Dock
+	var row_node = _find_row_by_path(path, container)
+	if row_node and row_node.get("parent_row"):
+		var parent_row = row_node.parent_row
+		var p_path = parent_row.topic_path
+		if active_visualizers.has(p_path):
+			var p_viz_info = active_visualizers[p_path]
+			var p_node = p_viz_info["node"]
+			if is_instance_valid(p_node):
+				parent = p_node
+				context["parent_viz_type"] = p_viz_info["type"]
+				context["parent_node"] = p_node
+				print("TopicDock: Parenting ", path, " viz to ", p_path, " viz")
+
+	# VALIDATION: Check if this visualizer requires a context (parent)
+	# and if we satisfied it.
+	# VALIDATION: Check parenting constraints strictly
+	var modifiers = VisualizerRegistry.RULES.get(viz_type, {}).get("context", [])
+	var current_p_type = context["parent_viz_type"]
 	
-	elif viz_type == "arrow":
-		var context = {"viz_type": viz_type}
-		# Simple arrow visualization (using a thin box for now)
-		viz_node = Node3D.new()
-		viz_node.set_script(load("res://visualizers/RobotVisualizer.gd"))
-		var mesh_inst = MeshInstance3D.new()
-		mesh_inst.mesh = BoxMesh.new()
-		mesh_inst.mesh.size = Vector3(0.1, 0.1, 1.0) # Long thin box
-		viz_node.add_child(mesh_inst)
-		if viz_node.has_method("setup"):
-			viz_node.setup(nt_instance_ref, path, context)
+	if current_p_type == "root":
+		# Adding at Root
+		# If visualizer has 'context', it REQUIRES a parent (is not top level).
+		if modifiers.size() > 0:
+			push_warning("TopicDock: Visualizer " + viz_type + " requires parent " + str(modifiers) + " but is at root.")
+			return
+	else:
+		# Adding Nested (under a visualizer)
+		# If visualizer has 'context', it must include this parent.
+		# If visualizer has NO 'context' (empty), it is Top Level Only and cannot be nested.
+		if not current_p_type in modifiers:
+			var msg = "TopicDock: Visualizer " + viz_type + " cannot be nested under " + current_p_type
+			if modifiers.is_empty():
+				msg += " (It is Top Level only)"
+			else:
+				msg += " (Requires " + str(modifiers) + ")"
+			push_warning(msg)
+			return
 
-	elif viz_type == "swerve_states":
-		var context = {"viz_type": viz_type}
-		viz_node = Node3D.new()
-		viz_node.set_script(load("res://visualizers/SwerveStateVisualizer.gd"))
-		if viz_node.has_method("setup"):
-			viz_node.setup(nt_instance_ref, path, context)
-
+	# 2. Instantiate Node
+	var viz_node = null
+	
+	match viz_type:
+		"Robot":
+			viz_node = Node3D.new()
+			viz_node.set_script(load("res://visualizers/RobotVisualizer.gd"))
+			# Default debug mesh
+			var mesh_inst = MeshInstance3D.new()
+			mesh_inst.mesh = BoxMesh.new()
+			mesh_inst.mesh.size = Vector3(0.5, 0.5, 0.5)
+			viz_node.add_child(mesh_inst)
+			
+		"Game Piece":
+			viz_node = MultiMeshInstance3D.new()
+			viz_node.set_script(load("res://visualizers/GamePieceVisualizer.gd"))
+			
+		"Swerve States":
+			viz_node = Node3D.new()
+			viz_node.set_script(load("res://visualizers/SwerveStateVisualizer.gd"))
+			
+		_:
+			# Generic/Placeholder for unimplemented types from Registry
+			print("TopicDock: Using generic visualizer placeholder for ", viz_type)
+			viz_node = Node3D.new()
+			# Maybe attach a generic script if needed? 
+			# For now, empty node serves as parent anchor or modifier target.
+			
 	if viz_node:
 		parent.add_child(viz_node)
+		if viz_node.has_method("setup"):
+			viz_node.setup(nt_instance_ref, path, context)
+			
 		active_visualizers[path] = {"node": viz_node, "type": viz_type}
+
 
 func remove_visualizer(path: String):
 	if active_visualizers.has(path):
@@ -209,9 +231,9 @@ func _gather_topics_recursive(parent_container, list: Array):
 			if active_visualizers.has(child.topic_path):
 				data["viz"] = active_visualizers[child.topic_path]["type"]
 			
-			# Recurse into ChildrenContainer
-			if child.has_node("ChildrenContainer"):
-				_gather_topics_recursive(child.get_node("ChildrenContainer"), data["children"])
+			# Recurse into ChildrenContainer (nested in MarginContainer)
+			if child.has_node("MarginContainer/ChildrenContainer"):
+				_gather_topics_recursive(child.get_node("MarginContainer/ChildrenContainer"), data["children"])
 				
 			list.append(data)
 
@@ -220,25 +242,17 @@ func _find_row_by_path(path: String, parent_node: Node) -> Node:
 		if "topic_path" in child and child.topic_path == path:
 			return child
 		# Recurse
-		if child.has_node("ChildrenContainer"):
-			var found = _find_row_by_path(path, child.get_node("ChildrenContainer"))
+		if child.has_node("MarginContainer/ChildrenContainer"):
+			var found = _find_row_by_path(path, child.get_node("MarginContainer/ChildrenContainer"))
 			if found: return found
 	return null
 
 func restore_topics(list: Array[Dictionary], nt_node):
 	nt_instance_ref = nt_node
-	# Clear existing topics? Or just add missing?
-	# Implementation choice: Clear UI first or just append. 
-	# TopicDock usually clears on reload if not persistent.
-	# But here we are just appending.
-	
 	_restore_topics_recursive(list, container, nt_node)
 
 func _restore_topics_recursive(list: Array, parent_node: Node, nt_node: Node):
 	for item in list:
-		# Add row to parent_node
-		# Note: add_topic adds to `container` by default interactively. 
-		# We need manual instantiation here to respect hierarchy.
 		var row = topic_row_scene.instantiate()
 		parent_node.add_child(row)
 		row.setup(item["path"], item["type"], nt_node)
@@ -246,20 +260,20 @@ func _restore_topics_recursive(list: Array, parent_node: Node, nt_node: Node):
 		row.tree_exiting.connect(_on_row_exiting.bind(row))
 		row.tree_exiting.connect(_notify_change)
 		
-		# If parent_node is a ChildrenContainer, set parent_row?
-		# The row script sets parent_row explicitly on drop, but here we just rely on tree structure.
-		# But `_find_row_by_path` relies on `parent_row` property?
-		# No, `_find_row_by_path` traverses nodes.
-		# BUT `add_visualizer` checks `row.parent_row`. We MUST set it.
-		
+		# If parent_node is a ChildrenContainer, set parent_row
+		# We need to traverse up: ChildrenContainer -> MarginContainer -> TopicRow
 		if parent_node.name == "ChildrenContainer":
-			row.parent_row = parent_node.get_parent() # TopicRow
+			# It should be MarginContainer -> TopicRow
+			var margin = parent_node.get_parent()
+			if margin:
+				row.parent_row = margin.get_parent() # TopicRow
 		
 		if item.has("viz"):
-			add_visualizer(item["path"], item["viz"])
+			add_visualizer(item["path"], item["viz"], item["type"])
 			
 		if item.has("children"):
-			_restore_topics_recursive(item["children"], row.get_node("ChildrenContainer"), nt_node)
+			_restore_topics_recursive(item["children"], row.get_node("MarginContainer/ChildrenContainer"), nt_node)
+
 
 func _notify_change():
 	# Signal up to main/persistence manager to save

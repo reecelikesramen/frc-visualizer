@@ -60,9 +60,27 @@ func _can_drop_data(at_position, data):
 		var source_node = data.get("source_node")
 		if source_node == self: return false # Can't drop on self
 		
-		# Allow universal nesting for now as discussed
-		
-		# Show Highlight
+		# STRICT VALIDATION based on User Request
+		# "Add to existing 'Robot' or 'Ghost' item"
+		# Check if THIS row (parent) has an active visualizer
+		var dock = get_dock()
+		if dock and dock.active_visualizers.has(topic_path):
+			var parent_viz_info = dock.active_visualizers[topic_path]
+			var parent_viz_type = parent_viz_info["type"]
+			
+			var child_nt_type = data.get("nt_type", "")
+			
+			# Check if there are any compatible modifiers for this child type given the parent
+			var modifiers = VisualizerRegistry.get_compatible_modifiers(child_nt_type, parent_viz_type)
+			if modifiers.is_empty():
+				# No compatible modifiers? REJECT.
+				return false
+		else:
+			# Parent has NO visualizer.
+			# User strict rule: "Prevent top-level visualizers from being nested under any other visualizer."
+			# And "Add to existing 'Robot' or 'Ghost' item" implies parent MUST be visualized.
+			return false
+
 		_set_drag_highlight(true)
 		return true
 	return false
@@ -70,32 +88,51 @@ func _can_drop_data(at_position, data):
 func _drop_data(at_position, data):
 	_set_drag_highlight(false)
 	
-	# Calculate drop zone
-	# If dropped on the TopBar -> Nest
-	# If dropped on ChildrenContainer area -> Reorder children?
-	# But mostly we drop ON the row to nest.
-	
+	if not _can_drop_data(at_position, data): return
+
 	var source_node = data.get("source_node")
-	if not is_instance_valid(source_node): return
 	
-	# If source is already our child, we might be reordering? 
-	# Let's keep simple: Drop on this row = Nest inside this row.
+	if is_instance_valid(source_node):
+		# Existing Node Move
+		print("Nesting ", source_node.topic_path, " under ", topic_path)
+		if source_node.get_parent():
+			source_node.get_parent().remove_child(source_node)
+		children_container.add_child(source_node)
+		source_node.parent_row = self
+		# Notify dock of structure change
+		get_tree().call_group("dock_updates", "_notify_change")
+		return
+
+	# New Topic Drop (from Tree)
+	var path = data.get("path")
+	var type = data.get("nt_type")
+	var nt_ref = data.get("nt_ref")
 	
-	print("Nesting ", source_node.topic_path, " under ", topic_path)
-	
-	# Reparent
-	if source_node.get_parent():
-		source_node.get_parent().remove_child(source_node)
+	if path and type:
+		# Check duplicates in immediate children?
+		for child in children_container.get_children():
+			if "topic_path" in child and child.topic_path == path:
+				return # Already exists
 		
-	children_container.add_child(source_node)
-	source_node.parent_row = self
-	
-	# Update indentation/visuals?
-	# VBox handles layout. We might want a margin.
-	# For now standard VBox.
-	
-	# Notify dock of structure change
-	get_tree().call_group("dock_updates", "_notify_change")
+		# Instantiate new row
+		# We need to load the scene. self.filename? Or preload from script?
+		# TopicDock has the scene preloaded. We can ask Dock?
+		# Or just load("res://TopicRow.tscn")
+		var new_row = load("res://TopicRow.tscn").instantiate()
+		children_container.add_child(new_row)
+		new_row.setup(path, type, nt_ref)
+		new_row.parent_row = self
+		
+		# Connect signals logic is tricky because `TopicDock` usually connects them.
+		# `TopicRow` doesn't have `_on_visualization_requested`.
+		# We need to connect the new row's signals to `TopicDock`!
+		var dock = get_dock()
+		if dock:
+			new_row.visualization_requested.connect(dock._on_visualization_requested)
+			new_row.tree_exiting.connect(dock._on_row_exiting.bind(new_row))
+			new_row.tree_exiting.connect(dock._notify_change)
+		
+		get_tree().call_group("dock_updates", "_notify_change")
 
 func _notification(what):
 	if what == NOTIFICATION_MOUSE_EXIT:
@@ -202,40 +239,90 @@ func _on_icon_gui_input(event):
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_show_context_menu()
 
+func get_dock():
+	# Traverse up to find TopicDock
+	# Row -> VBox -> ScrollContainer -> TopicDock
+	var p = get_parent()
+	while p:
+		if p.name == "TopicDock" or p.get_script() == load("res://TopicDock.gd"):
+			return p
+		p = p.get_parent()
+	return null
+
 func _show_context_menu():
 	var popup = PopupMenu.new()
 	popup.add_item("Visualize as Text (Default)", 0)
 	
-	if topic_type == "struct:Pose3d":
-		popup.add_separator()
-		popup.add_item("Visualize as Robot", 100)
-		popup.add_item("Visualize as Arrow", 101)
-	elif topic_type == "struct:Pose3d[]":
-		popup.add_separator()
-		popup.add_item("Visualize as Game Pieces", 200)
-	elif topic_type == "struct:SwerveModuleState[]":
-		popup.add_separator()
-		popup.add_item("Visualize as Swerve States", 300)
+	# Dictionary to map IDs to specific visualizer names strings
+	# because PopupMenu uses integer IDs.
+	var id_map = {}
+	var current_id = 100
+	
+	# Check Parent Visualization Status
+	var has_visualized_parent = false
+	var parent_viz_type = ""
+	
+	if parent_row:
+		var dock = get_dock()
+		if dock and dock.active_visualizers.has(parent_row.topic_path):
+			has_visualized_parent = true
+			parent_viz_type = dock.active_visualizers[parent_row.topic_path]["type"]
+
+	# 1. Top Level Visualizers
+	# ONLY show if we are NOT nested under a visualizer.
+	if not has_visualized_parent:
+		# Check if we are compatible with any top level visualizers
+		var compatible_viz = VisualizerRegistry.get_compatible_visualizers(topic_type)
 		
-	# Simple disconnect checking to avoid duplicate connections if this is called multiple times?
-	# Popup is new instance every time, so it's fine.
-	popup.id_pressed.connect(_on_context_menu_item_selected)
+		if compatible_viz.size() > 0:
+			popup.add_separator("Visualizers")
+			for viz in compatible_viz:
+				popup.add_item(viz, current_id)
+				id_map[current_id] = viz
+				current_id += 1
+			
+	# 2. Modifiers (Context-based)
+	if has_visualized_parent:
+		var modifiers = VisualizerRegistry.get_compatible_modifiers(topic_type, parent_viz_type)
+		
+		if modifiers.size() > 0:
+			popup.add_separator("Add to Parent")
+			for mod in modifiers:
+				popup.add_item(mod, current_id)
+				id_map[current_id] = mod
+				current_id += 1
+	
+	# Store the map on the popup or self for retrieval?
+	# PopupMenu doesn't store arbitrary data per item easily besides metadata...
+	# Set metadata for each item!
+	for id in id_map:
+		var idx = popup.get_item_index(id)
+		popup.set_item_metadata(idx, id_map[id])
+
+	popup.id_pressed.connect(_on_context_menu_item_selected.bind(popup))
 	add_child(popup)
 	popup.position = get_global_mouse_position()
 	popup.show()
 
-func _on_context_menu_item_selected(id):
-	match id:
-		100:
-			visualization_requested.emit(topic_path, topic_type, "robot")
-		101:
-			visualization_requested.emit(topic_path, topic_type, "arrow")
-		200:
-			visualization_requested.emit(topic_path, topic_type, "game_pieces")
-		300:
-			visualization_requested.emit(topic_path, topic_type, "swerve_states")
-		_:
-			print("Selected visualization id: ", id)
+func _on_context_menu_item_selected(id, popup: PopupMenu):
+	var index = popup.get_item_index(id)
+	var viz_name = popup.get_item_metadata(index)
+	
+	if id == 0:
+		# Text / Default (clears others?)
+		# Actually TopicDock "add_visualizer" checks if active and replaces/toggles.
+		# If we select 0, implying "Remove Visualization".
+		# Let's send a special signal or just null?
+		# Existing logic: "If clicking the same type, we treat it as toggle OFF".
+		# Text is basically "None".
+		visualization_requested.emit(topic_path, topic_type, "none")
+		return
+
+	if viz_name:
+		visualization_requested.emit(topic_path, topic_type, viz_name)
+	else:
+		print("Unknown visualizer ID selected: ", id)
+
 	
 func _on_close_button_pressed():
 	queue_free()

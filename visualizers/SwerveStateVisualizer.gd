@@ -7,16 +7,16 @@ var topic_path: String = ""
 var arrows: Array[Node3D] = []
 var arrow_length_scale = 1.0 # Scale factor for speed -> length
 
-# Swerve Layout (Standard Square Frame)
-# Godot: Forward is -Z, Left is +X? No, standard 3D in Godot is Right(+X), Up(+Y), Forward(-Z)?
-# Wait, FRC Coordinate System: Forward +X, Left +Y.
-# We map FRC +X -> Godot -Z.
-# We map FRC +Y -> Godot -X.
-# So FL (FRC +X, +Y) -> Godot (-Z, -X).
-#     FR (FRC +X, -Y) -> Godot (-Z, +X).
-#     BL (FRC -X, +Y) -> Godot (+Z, -X).
-#     BR (FRC -X, -Y) -> Godot (+Z, +X).
+# Structure Configuration
+var arrangement_map: Array[int] = [0, 1, 2, 3] # visual_idx -> data_idx
+var arrow_color: Color = Color(1, 0, 0) # Default Red
 
+# Standard Visual Quadrants: FL, FR, BL, BR
+# Godot Coordinates: Forward(-Z), Left(-X) -> Right(+X)
+# FL: Forward, Left -> -Z, -X
+# FR: Forward, Right -> -Z, +X
+# BL: Back, Left -> +Z, -X
+# BR: Back, Right -> +Z, +X
 const MODULE_OFFSET = 0.3 # Meters from center
 const MODULE_POSITIONS = [
 	Vector3(-MODULE_OFFSET, 0, -MODULE_OFFSET), # FL (Godot: -X, -Z)
@@ -25,28 +25,92 @@ const MODULE_POSITIONS = [
 	Vector3(MODULE_OFFSET, 0, MODULE_OFFSET) # BR (Godot: +X, +Z)
 ]
 
+# Map strings to Standard Position Indices
+const QUADRANT_NAMES = ["FL", "FR", "BL", "BR"]
+
 func setup(nt: Node, path: String, context: Dictionary = {}):
 	nt_instance = nt
 	topic_path = path
+
+	# Parse Context Options
+	# 1. Arrangement
+	# Default: "FL/FR/BL/BR"
+	var arr_str = "FL/FR/BL/BR"
+	# User options might be nested? The registry says options struct.
+	# But typically options are passed flattened or we look them up?
+	# In the `add_visualizer` of `TopicDock`, we didn't extract user selections from a UI yet.
+	# We just passed defaults/User selection from future UI. 
+	# For now, let's assume if context has "options", we use it, else default.
+	# Wait, relying on the user to *select* options in a menu hasn't been implemented in TopicDock yet.
+	# But we need to support it IF passed.
+	if context.has("Arrangement"):
+		arr_str = context["Arrangement"]
+	
+	_parse_arrangement(arr_str)
+	
+	# 2. Color
+	var color_name = "Red"
+	if context.has("Color"):
+		color_name = context["Color"]
+	
+	_set_color(color_name)
 	
 	_create_arrows()
 
+func _parse_arrangement(arr_str: String):
+	var tokens = arr_str.split("/")
+	if tokens.size() != 4:
+		push_warning("SwerveStateVisualizer: Invalid arrangement string '" + arr_str + "', utilizing default.")
+		arrangement_map = [0, 1, 2, 3]
+		return
+		
+	# visual_idx 0 is ALWAYS FL spatial position
+	# We find where "FL" is in the tokens. That index is the data index.
+	for i in range(4):
+		var key = QUADRANT_NAMES[i]
+		var data_idx = tokens.find(key)
+		if data_idx == -1:
+			push_warning("SwerveStateVisualizer: Missing key " + key + " in arrangement.")
+			data_idx = i # Fallback
+		
+		# Ensure map is sized
+		if arrangement_map.size() <= i:
+			arrangement_map.resize(i + 1)
+			
+		arrangement_map[i] = data_idx
+
+func _set_color(color_name: String):
+	match color_name:
+		"Red": arrow_color = Color.RED
+		"Blue": arrow_color = Color.BLUE
+		"Green": arrow_color = Color.GREEN
+		"Orange": arrow_color = Color.ORANGE
+		"Cyan": arrow_color = Color.CYAN
+		"Yellow": arrow_color = Color.YELLOW
+		"Magenta": arrow_color = Color.MAGENTA
+		_: arrow_color = Color.RED
+
 func _create_arrows():
-	# Create 4 arrows
+	# Clear existing
+	for c in get_children():
+		c.queue_free()
+	arrows.clear()
+	
+	# Create 4 arrows fixed to the 4 Quadrants
 	for i in range(4):
 		var arrow_root = Node3D.new()
+		
+		# Material
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = arrow_color
 		
 		# Arrow Shaft
 		var shaft = MeshInstance3D.new()
 		var shaft_mesh = BoxMesh.new()
 		shaft_mesh.size = Vector3(0.05, 0.05, 1.0) # Length 1 initially
 		shaft.mesh = shaft_mesh
-		shaft.position.z = -0.5 # Center the shaft so it grows from origin forward
-		# Material (Red)
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(1, 0, 0)
+		shaft.position.z = -0.5 # Grow forward from origin
 		shaft.mesh.surface_set_material(0, mat)
-		
 		arrow_root.add_child(shaft)
 		
 		# Arrow Head
@@ -54,83 +118,57 @@ func _create_arrows():
 		var head_mesh = PrismMesh.new()
 		head_mesh.size = Vector3(0.15, 0.2, 0.15)
 		head.mesh = head_mesh
-		head.rotation.x = - PI / 2 # Point forward
-		head.position.z = -1.0 # Tip of shaft
+		head.rotation.x = - PI / 2
+		head.position.z = -1.0
 		head.mesh.surface_set_material(0, mat)
-		
 		arrow_root.add_child(head)
 		
-		# Store references for updates (we might scale the root or shaft)
-		# Actually, scaling the root is easiest.
-		arrows.append(arrow_root)
 		add_child(arrow_root)
+		arrows.append(arrow_root)
 		
-		# Set initial base positions (relative to this node)
-		# If this node is parented to the robot, these are relative to robot center.
-		# But wait, standard SwerveModuleState order is usually FL, FR, BL, BR or similar.
-		# Let's assume standard order: 0: FL, 1: FR, 2: BL, 3: BR
-		# Adjust positions if needed.
-		if i < MODULE_POSITIONS.size():
-			arrow_root.position = MODULE_POSITIONS[i]
+		# Position relative to robot center
+		arrow_root.position = MODULE_POSITIONS[i]
 
 func _process(_delta: float) -> void:
 	if not nt_instance or topic_path == "":
 		return
 
-	# Fetch data
-	# We expect struct:SwerveModuleState[]
-	# The raw data is a PackedByteArray if using generic get_value, 
-	# OR we might have a helper for module states if we added one. 
-	# TopicRow used `StructParser.gd` to parse. We should probably use that too.
-	
+	# Parse Struct Array
 	var raw = nt_instance.get_value(topic_path, PackedByteArray())
 	if typeof(raw) == TYPE_PACKED_BYTE_ARRAY and raw.size() > 0:
-		# Assume StructParser is globally available or we load it
-		# We need to know the type string exactly to parse.
-		# But wait, `get_value` returns raw bytes.
-		# Use `StructParser.parse_packet`.
-		# We assume the topic is compatible.
 		var data = StructParser.parse_packet(raw, "struct:SwerveModuleState[]")
 		if typeof(data) == TYPE_ARRAY and data.size() >= 4:
 			_update_visuals(data)
 
 func _update_visuals(states: Array):
-	for i in range(4):
-		if i >= arrows.size(): break
+	for viz_idx in range(4):
+		var data_idx = arrangement_map[viz_idx]
+		if data_idx >= states.size(): continue
 		
-		var state = states[i] # specific struct dictionary
-		# Expected keys: "angle" (double, radians), "speed" (double, m/s)
-		
+		var state = states[data_idx]
 		var angle = state.get("angle", 0.0)
 		var speed = state.get("speed", 0.0)
 		
-		var arrow = arrows[i]
+		var arrow = arrows[viz_idx]
 		
-		# Rotation
-		# Swerve angles are usually standard CCW from +X or +Y?
-		# WPILib Rotation2d is CCW+, 0 is +X (forward).
-		# Godot 3D: -Z is forward. +X is right. +Y is up.
-		# So 0 degrees (forward) should be -Z.
-		# If WPILib 0 is +X (Field Forward?), and usually robot forward.
-		# Let's assume 0 radians = Robot Forward (-Z in Godot).
-		# If 0 is +X in WPILib, and Field X is Forward...
-		# Let's start with: Godot Y rotation = WPILib Angle.
-		# But checking coordinate systems:
-		# WPILib: X forward, Y left, Z up.
-		# Godot: -Z forward, +X right, +Y up.
-		# So WPILib +X -> Godot -Z.
-		# WPILib +Y -> Godot -X (Left vs Right).
-		# Rotation around Z (WPILib) -> Rotation around Y (Godot).
-		# CCW in WPILib (X to Y) -> (-Z to -X).
-		# Godot Top View: -Z is Up on screen, -X is Left. 
-		# So CCW is correct.
-		arrow.rotation.y = angle
+		# Logic:
+		# Angle=0 -> Forward (-Z).
+		# Rotation Y is CCW around Up (+Y).
+		# FRC Angle 0 is Forward +X. +90 is Left +Y.
+		# Godot -Z is Forward. -X is Left. 
+		# Rotation Y +90 turns -Z to -X.
+		# So FRC Angle -> Godot Y Rotation is 1:1.
 		
-		# Length/Scale
-		# Scale the arrow length by speed.
-		# Scale z axis.
-		var length = abs(speed) * 0.5 # Scale factor
-		if length < 0.1: length = 0.1 # Minimum visibility
+		# Direction Reversal for negative speed
+		var effective_angle = angle
+		if speed < 0:
+			effective_angle += PI
+			
+		arrow.rotation.y = effective_angle
+		
+		# Length
+		var length = abs(speed) * 0.5
+		if length < 0.1: length = 0.1
 		
 		arrow.scale.z = length
 		arrow.visible = true
