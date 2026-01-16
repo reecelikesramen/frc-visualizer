@@ -1,9 +1,10 @@
-[gd_scene load_steps=15 format=3 uid="uid://b37igovglwinu"]
+[gd_scene load_steps=16 format=3 uid="uid://b37igovglwinu"]
 
 [ext_resource type="Script" uid="uid://clls3330y86lk" path="res://Main.gd" id="1_272bh"]
 [ext_resource type="PackedScene" uid="uid://cbfhfk2kvrvni" path="res://fields/rebuilt/assets/rebuilt_import.scn" id="1_ig7tw"]
 [ext_resource type="Script" uid="uid://cng042w20ifja" path="res://FreeLookCamera.gd" id="2_7mycd"]
 [ext_resource type="PackedScene" uid="uid://b8x6c8x7eax0" path="res://NTTreeView.tscn" id="3_h2yge"]
+[ext_resource type="Script" uid="uid://456458rr87sj" path="res://Field2D.gd" id="4_field2d"]
 [ext_resource type="PackedScene" uid="uid://b0d8x7483rjrp" path="res://TopicDock.tscn" id="5_topicdock"]
 [ext_resource type="ArrayMesh" uid="uid://cm41flj20561y" path="res://fields/rebuilt/assets/collision/bump.obj" id="6_7mycd"]
 [ext_resource type="ArrayMesh" uid="uid://bljrl02d8hyec" path="res://fields/rebuilt/assets/collision/hub.obj" id="7_efxa6"]
@@ -46,15 +47,34 @@ split_offset = 300
 [node name="NTTreeView" parent="HSplitContainer" instance=ExtResource("3_h2yge")]
 layout_mode = 2
 
-[node name="VSplitContainer" type="VSplitContainer" parent="HSplitContainer"]
+[node name="RightSide" type="VBoxContainer" parent="HSplitContainer"]
 layout_mode = 2
+
+[node name="TabBar" type="TabBar" parent="HSplitContainer/RightSide"]
+layout_mode = 2
+current_tab = 0
+tab_count = 2
+tab_0/title = "3D Field"
+tab_1/title = "2D Field"
+
+[node name="VSplitContainer" type="VSplitContainer" parent="HSplitContainer/RightSide"]
+layout_mode = 2
+size_flags_vertical = 3
 split_offset = 400
 
-[node name="Spacer" type="Control" parent="HSplitContainer/VSplitContainer"]
+[node name="ViewContainer" type="MarginContainer" parent="HSplitContainer/RightSide/VSplitContainer"]
+layout_mode = 2
+
+[node name="Spacer" type="Control" parent="HSplitContainer/RightSide/VSplitContainer/ViewContainer"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="TopicDock" parent="HSplitContainer/VSplitContainer" instance=ExtResource("5_topicdock")]
+[node name="Field2D" type="Control" parent="HSplitContainer/RightSide/VSplitContainer/ViewContainer"]
+visible = false
+layout_mode = 2
+script = ExtResource("4_field2d")
+
+[node name="TopicDock" parent="HSplitContainer/RightSide/VSplitContainer" instance=ExtResource("5_topicdock")]
 layout_mode = 2
 
 [node name="RobotParent" type="Node3D" parent="."]
@@ -70,6 +90,7 @@ shadow_enabled = true
 shadow_blur = 1.2
 
 [node name="TempCollision" type="Node3D" parent="."]
+visible = false
 
 [node name="Bump" type="MeshInstance3D" parent="TempCollision"]
 transform = Transform3D(-4.371139e-08, 1, 4.371139e-08, 0, -4.371139e-08, 1, 1, 4.371139e-08, 1.9106855e-15, -2.505, -0.021, -4.614)

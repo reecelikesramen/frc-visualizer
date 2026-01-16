@@ -35,7 +35,8 @@ const TYPE_MAPPING = {
 }
 
 # The Rules Definition
-const RULES = {
+# The Rules Definition
+const RULES_3D = {
 	"Robot": {
 		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "number[]"],
 		"options": {
@@ -129,48 +130,111 @@ const RULES = {
 	}
 }
 
+const RULES_2D = {
+	"Robot": {
+		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "number[]"],
+		"options": {
+			"Bumpers": ["Alliance Color", "Green", "Red", "Blue", "Orange", "Cyan", "Yellow", "Magenta"]
+		}
+	},
+	"Ghost": {
+		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "number[]"],
+		"options": {
+			"Color": ["Green", "Red", "Blue", "Orange", "Cyan", "Yellow", "Magenta"]
+		}
+	},
+	"Vision Target": {
+		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "Translation2d", "Translation3d", "Translation2d[]", "Translation3d[]", "number[]"],
+		"options": {
+			"Color": ["Green", "Red", "Blue", "Orange", "Cyan", "Yellow", "Magenta"],
+			"Thickness": ["Normal", "Bold"]
+		},
+		"context": ["Robot", "Ghost"]
+	},
+	"Swerve States": {
+		"sources": ["SwerveModuleState[]", "number[]"],
+		"options": {
+			"Color": ["Red", "Blue", "Green", "Orange", "Cyan", "Yellow", "Magenta"],
+			"Arrangement": ["FL/FR/BL/BR", "FR/FL/BR/BL", "FL/FR/BR/BL", "FL/BL/BR/FR", "FR/BR/BL/FL", "FR/FL/BL/BR"]
+		},
+		"context": ["Robot", "Ghost"]
+	},
+	"Rotation Override": {
+		"sources": ["Rotation2d", "Rotation3d", "number"],
+		"options": {},
+		"context": ["Robot", "Ghost"]
+	},
+	"Trajectory": {
+		"sources": ["Pose2d[]", "Pose3d[]", "Transform2d[]", "Transform3d[]", "Translation2d[]", "Translation3d[]", "SwerveSample[]", "DifferentialSample[]", "Trajectory", "number[]"],
+		"options": {
+			"Color": ["Green", "Red", "Blue", "Orange", "Cyan", "Yellow", "Magenta"],
+			"Thickness": ["Normal", "Bold"]
+		}
+	},
+	"Heatmap": {
+		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "Translation2d", "Translation3d", "Translation2d[]", "Translation3d[]", "number[]"],
+		"options": {
+			"Time Range": ["Enabled", "Auto", "Teleop", "Teleop (No Endgame)", "Full Log", "Visible Range"]
+		}
+	},
+	"Arrow": {
+		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "DifferentialSample[]", "SwerveSample[]", "Trajectory", "number[]"],
+		"options": {
+			"Position": ["Center", "Back", "Front"]
+		}
+	}
+}
+
+static func get_rules(mode: String = "3D") -> Dictionary:
+	return RULES_2D if mode == "2D" else RULES_3D
+	
+# Backwards compatibility accessor for 3D rules if accessed directly via property (it's const though)
+# We replaced the const RULES, so direct access will break. We must fix callsites.
+# Since we are updating callsites, we don't need to emulate the const.
+const RULES = {} # Deprecated, empty to force error/refactor? Or alias to 3D?
+# GDScript const cannot be dynamic.
+# Let's alias RULES to RULES_3D for compatibility if I miss any spots, assuming 3D is default.
+# But I removed RULES so I should re-add it or alias it if possible.
+# GDScript doesn't support aliasing consts like `const RULES = RULES_3D` easily if RULES_3D is defined above in same block?
+# Actually it does.
+
 static func get_abstract_type(nt_type: String) -> String:
 	if TYPE_MAPPING.has(nt_type):
 		return TYPE_MAPPING[nt_type]
 	# Fallback/Pass-through
 	return nt_type
 
-static func is_compatible(nt_type: String, visualizer_name: String) -> bool:
-	if not RULES.has(visualizer_name): return false
+static func is_compatible(nt_type: String, visualizer_name: String, mode: String = "3D") -> bool:
+	var rules = get_rules(mode)
+	if not rules.has(visualizer_name): return false
 	var abstract = get_abstract_type(nt_type)
-	var sources = RULES[visualizer_name]["sources"]
+	var sources = rules[visualizer_name]["sources"]
 	return abstract in sources
 
-static func get_compatible_visualizers(nt_type: String) -> Array[String]:
+static func get_compatible_visualizers(nt_type: String, mode: String = "3D") -> Array[String]:
 	var list: Array[String] = []
 	var abstract = get_abstract_type(nt_type)
-	for viz in RULES:
+	var rules = get_rules(mode)
+	
+	for viz in rules:
 		# Check if this visualizer supports this source
-		if abstract in RULES[viz]["sources"]:
-			# Check context constraints?
-			# If a visualizer requires a context (e.g. "Add to existing..."), 
-			# it generally shouldn't be a TOP LEVEL option for a "new" visualizer,
-			# unless we are handling context in the UI. 
-			# For now, let's include everything, and UI can filter if it's "Add to..."
-			# Wait, user said "Add to existing 'Robot' or 'Ghost' item."
-			# This implies these are secondary modifiers.
-			# But "Robot" itself is top level.
-			# If we are dragging a topic to the empty dock, we only show Top Level visualizers.
-			# If we are right clicking a topic, we might show all?
-			# Let's distinguish Top Level vs Child.
-			if not RULES[viz].has("context"):
+		if abstract in rules[viz]["sources"]:
+			# Check context constraints
+			if not rules[viz].has("context"):
 				list.append(viz)
-			elif RULES[viz]["context"].is_empty(): # Should not happen based on manual dict
+			elif rules[viz]["context"].is_empty():
 				list.append(viz)
 				
 	return list
 
 # To get child visualizers (modifiers)
-static func get_compatible_modifiers(nt_type: String, parent_viz_type: String) -> Array[String]:
+static func get_compatible_modifiers(nt_type: String, parent_viz_type: String, mode: String = "3D") -> Array[String]:
 	var list: Array[String] = []
 	var abstract = get_abstract_type(nt_type)
-	for viz in RULES:
-		if RULES[viz].has("context") and parent_viz_type in RULES[viz]["context"]:
-			if abstract in RULES[viz]["sources"]:
+	var rules = get_rules(mode)
+	
+	for viz in rules:
+		if rules[viz].has("context") and parent_viz_type in rules[viz]["context"]:
+			if abstract in rules[viz]["sources"]:
 				list.append(viz)
 	return list

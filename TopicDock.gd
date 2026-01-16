@@ -9,6 +9,8 @@ var nt_instance_ref = null
 
 var active_visualizers = {} # path -> { "node": Node, "type": String }
 
+var current_mode = "3D"
+
 func _ready():
 	# Try to find NT instance if not set
 	# It's usually a child of NTTreeView, which is a sibling of the parent's parent...
@@ -28,7 +30,7 @@ func _can_drop_data(at_position, data):
 		# (Checking only Top Level compatibility for drag-drop to root? 
 		# Or generic compatibility. User said "Only topics that are true for these supplied predicates")
 		# We check if *any* visualizer exists for this type.
-		if VisualizerRegistry.get_compatible_visualizers(nt_type).is_empty():
+		if VisualizerRegistry.get_compatible_visualizers(nt_type, current_mode).is_empty():
 			return false
 		return true
 	return false
@@ -102,6 +104,8 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 		return
 
 	# 1. Resolve Parent
+	# TODO: In 2D mode, we might need a different parent hierarchy or rendering surface.
+	# For now we use the same structure but validation prevents invalid types.
 	var main = OwnerUtils.get_main(self)
 	var parent = main.get_node_or_null("RobotParent")
 	if not parent:
@@ -113,7 +117,8 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 		"viz_type": viz_type,
 		"topic_type": nt_type,
 		"parent_viz_type": "root",
-		"parent_node": null
+		"parent_node": null,
+		"mode": current_mode
 	}
 
 	# Check for hierarchy nesting in the Dock
@@ -133,7 +138,8 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 	# VALIDATION: Check if this visualizer requires a context (parent)
 	# and if we satisfied it.
 	# VALIDATION: Check parenting constraints strictly
-	var modifiers = VisualizerRegistry.RULES.get(viz_type, {}).get("context", [])
+	var rules = VisualizerRegistry.get_rules(current_mode)
+	var modifiers = rules.get(viz_type, {}).get("context", [])
 	var current_p_type = context["parent_viz_type"]
 	
 	if current_p_type == "root":
@@ -197,6 +203,29 @@ func remove_visualizer(path: String):
 		if is_instance_valid(info.node):
 			info.node.queue_free()
 		active_visualizers.erase(path)
+
+var suppress_notify = false
+
+func clear_topics():
+	print("TopicDock: clear_topics called. Children count: ", container.get_child_count())
+	suppress_notify = true
+	
+	# 1. Clear all visualizers
+	var paths = active_visualizers.keys()
+	for path in paths:
+		remove_visualizer(path)
+	
+	# 2. Clear all topic rows
+	# Use while loop for safety with deletions
+	while container.get_child_count() > 0:
+		var child = container.get_child(0)
+		_remove_all_viz_in_branch(child)
+		container.remove_child(child) # Ensure removed from tree
+		child.free()
+		
+	suppress_notify = false
+	print("TopicDock: clear_topics finished. Children count: ", container.get_child_count())
+
 
 func _on_row_exiting(row_node: Node):
 	# If the row is being deleted (X button or parent deletion), remove viz.
@@ -276,6 +305,9 @@ func _restore_topics_recursive(list: Array, parent_node: Node, nt_node: Node):
 
 
 func _notify_change():
+	if suppress_notify:
+		return
+		
 	# Signal up to main/persistence manager to save
 	if OwnerUtils.get_main(self).has_method("save_ui_state"):
 		OwnerUtils.get_main(self).save_ui_state()

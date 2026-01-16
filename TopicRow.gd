@@ -67,11 +67,12 @@ func _can_drop_data(at_position, data):
 		if dock and dock.active_visualizers.has(topic_path):
 			var parent_viz_info = dock.active_visualizers[topic_path]
 			var parent_viz_type = parent_viz_info["type"]
+			var current_mode = dock.current_mode if "current_mode" in dock else "3D"
 			
 			var child_nt_type = data.get("nt_type", "")
 			
 			# Check if there are any compatible modifiers for this child type given the parent
-			var modifiers = VisualizerRegistry.get_compatible_modifiers(child_nt_type, parent_viz_type)
+			var modifiers = VisualizerRegistry.get_compatible_modifiers(child_nt_type, parent_viz_type, current_mode)
 			if modifiers.is_empty():
 				# No compatible modifiers? REJECT.
 				return false
@@ -139,16 +140,6 @@ func _notification(what):
 		_set_drag_highlight(false)
 	elif what == NOTIFICATION_DRAG_END:
 		_set_drag_highlight(false)
-
-func _set_drag_highlight(enabled: bool):
-	if is_drag_highlighted == enabled: return
-	is_drag_highlighted = enabled
-	if highlight_rect:
-		highlight_rect.visible = enabled
-	else:
-		# Fallback if node missing?
-		modulate = Color(1.2, 1.2, 1.2) if enabled else Color(1, 1, 1)
-
 
 func _process(_delta):
 	if nt_instance and topic_path != "":
@@ -228,8 +219,6 @@ func _set_params(missing: bool):
 	else:
 		modulate.a = 1.0
 
-signal visualization_requested(path: String, type: String, viz_type: String)
-
 func _ready():
 	# Setup icon input
 	icon_rect.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -251,10 +240,21 @@ func get_dock():
 
 func _show_context_menu():
 	var popup = PopupMenu.new()
-	popup.add_item("Visualize as Text (Default)", 0)
+	
+	# Determine current active visualizer
+	var dock = get_dock()
+	var current_mode = dock.current_mode if dock and "current_mode" in dock else "3D"
+	var current_viz = ""
+	
+	if dock and dock.active_visualizers.has(topic_path):
+		current_viz = dock.active_visualizers[topic_path]["type"]
+	
+	# Default Item
+	var default_checked = (current_viz == "")
+	popup.add_radio_check_item("Visualize as Text (Default)", 0)
+	popup.set_item_checked(popup.get_item_index(0), default_checked)
 	
 	# Dictionary to map IDs to specific visualizer names strings
-	# because PopupMenu uses integer IDs.
 	var id_map = {}
 	var current_id = 100
 	
@@ -263,37 +263,34 @@ func _show_context_menu():
 	var parent_viz_type = ""
 	
 	if parent_row:
-		var dock = get_dock()
 		if dock and dock.active_visualizers.has(parent_row.topic_path):
 			has_visualized_parent = true
 			parent_viz_type = dock.active_visualizers[parent_row.topic_path]["type"]
 
 	# 1. Top Level Visualizers
-	# ONLY show if we are NOT nested under a visualizer.
 	if not has_visualized_parent:
-		# Check if we are compatible with any top level visualizers
-		var compatible_viz = VisualizerRegistry.get_compatible_visualizers(topic_type)
+		var compatible_viz = VisualizerRegistry.get_compatible_visualizers(topic_type, current_mode)
 		
 		if compatible_viz.size() > 0:
 			popup.add_separator("Visualizers")
 			for viz in compatible_viz:
-				popup.add_item(viz, current_id)
+				popup.add_radio_check_item(viz, current_id)
+				popup.set_item_checked(popup.get_item_index(current_id), viz == current_viz)
 				id_map[current_id] = viz
 				current_id += 1
 			
 	# 2. Modifiers (Context-based)
 	if has_visualized_parent:
-		var modifiers = VisualizerRegistry.get_compatible_modifiers(topic_type, parent_viz_type)
+		var modifiers = VisualizerRegistry.get_compatible_modifiers(topic_type, parent_viz_type, current_mode)
 		
 		if modifiers.size() > 0:
 			popup.add_separator("Add to Parent")
 			for mod in modifiers:
-				popup.add_item(mod, current_id)
+				popup.add_radio_check_item(mod, current_id)
+				popup.set_item_checked(popup.get_item_index(current_id), mod == current_viz)
 				id_map[current_id] = mod
 				current_id += 1
 	
-	# Store the map on the popup or self for retrieval?
-	# PopupMenu doesn't store arbitrary data per item easily besides metadata...
 	# Set metadata for each item!
 	for id in id_map:
 		var idx = popup.get_item_index(id)
@@ -309,12 +306,7 @@ func _on_context_menu_item_selected(id, popup: PopupMenu):
 	var viz_name = popup.get_item_metadata(index)
 	
 	if id == 0:
-		# Text / Default (clears others?)
-		# Actually TopicDock "add_visualizer" checks if active and replaces/toggles.
-		# If we select 0, implying "Remove Visualization".
-		# Let's send a special signal or just null?
-		# Existing logic: "If clicking the same type, we treat it as toggle OFF".
-		# Text is basically "None".
+		# Text / Default
 		visualization_requested.emit(topic_path, topic_type, "none")
 		return
 
@@ -326,3 +318,13 @@ func _on_context_menu_item_selected(id, popup: PopupMenu):
 	
 func _on_close_button_pressed():
 	queue_free()
+
+func _set_drag_highlight(enabled: bool):
+	if is_drag_highlighted == enabled: return
+	is_drag_highlighted = enabled
+	if highlight_rect:
+		highlight_rect.visible = enabled
+	else:
+		modulate = Color(1.2, 1.2, 1.2) if enabled else Color(1, 1, 1)
+
+signal visualization_requested(path: String, type: String, viz_type: String)
