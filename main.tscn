@@ -1,19 +1,38 @@
-[gd_scene load_steps=5 format=3 uid="uid://b37igovglwinu"]
+[gd_scene load_steps=12 format=3 uid="uid://b37igovglwinu"]
 
+[ext_resource type="Script" uid="uid://clls3330y86lk" path="res://Main.gd" id="1_272bh"]
 [ext_resource type="PackedScene" uid="uid://cbfhfk2kvrvni" path="res://fields/rebuilt/assets/rebuilt_import.scn" id="1_ig7tw"]
 [ext_resource type="Script" uid="uid://qj1ggyeay5gh" path="res://test_nt4.gd" id="2_0xm2m"]
+[ext_resource type="Script" uid="uid://cng042w20ifja" path="res://FreeLookCamera.gd" id="2_7mycd"]
 [ext_resource type="PackedScene" uid="uid://b8x6c8x7eax0" path="res://NTTreeView.tscn" id="3_h2yge"]
+[ext_resource type="Script" uid="uid://cxs2xhu6ot7i1" path="res://GamePieceManager.gd" id="4_gamepiece"]
+[ext_resource type="PackedScene" uid="uid://b0d8x7483rjrp" path="res://TopicDock.tscn" id="5_topicdock"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_0xm2m"]
 size = Vector3(0.699, 0.762, 0.699)
 
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_lquwl"]
+
+[sub_resource type="Sky" id="Sky_5vw27"]
+sky_material = SubResource("ProceduralSkyMaterial_lquwl")
+
+[sub_resource type="Environment" id="Environment_kek77"]
+sky = SubResource("Sky_5vw27")
+ambient_light_source = 3
+ambient_light_sky_contribution = 0.8
+tonemap_mode = 2
+
 [node name="Node3D" type="Node3D"]
+script = ExtResource("1_272bh")
 
 [node name="model" parent="." instance=ExtResource("1_ig7tw")]
 transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, -4.0324006, 0, -8.255458)
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(-0.99635875, 0.0034647742, -0.08518996, -0.018174686, 0.96757776, 0.25191867, 0.083300754, 0.25254968, -0.9639915, -2.0244346, 5.2732444, -12.241826)
+script = ExtResource("2_7mycd")
+
+[node name="ReflectionProbe" type="ReflectionProbe" parent="Camera3D"]
 
 [node name="Node" type="Node" parent="."]
 
@@ -25,13 +44,37 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.381, 0)
 mesh = SubResource("BoxMesh_0xm2m")
 skeleton = NodePath("../..")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.969132, 0.044412516, 0.24250908, -0.24654238, 0.17458092, 0.95327777, 0, -0.9836408, 0.18014154, 0, 5.921615, 0)
-light_energy = 5.0
-shadow_enabled = true
+[node name="HSplitContainer" type="HSplitContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+split_offset = 300
 
-[node name="NTTreeView" parent="." instance=ExtResource("3_h2yge")]
-offset_left = 318.0
-offset_top = 382.0
-offset_right = 318.0
-offset_bottom = 382.0
+[node name="NTTreeView" parent="HSplitContainer" instance=ExtResource("3_h2yge")]
+layout_mode = 2
+
+[node name="VSplitContainer" type="VSplitContainer" parent="HSplitContainer"]
+layout_mode = 2
+split_offset = 400
+
+[node name="Spacer" type="Control" parent="HSplitContainer/VSplitContainer"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="TopicDock" parent="HSplitContainer/VSplitContainer" instance=ExtResource("5_topicdock")]
+layout_mode = 2
+
+[node name="GamePieceParent" type="MultiMeshInstance3D" parent="."]
+script = ExtResource("4_gamepiece")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_kek77")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.34202015, 0.88302225, -0.32139385, 0, 0.34202018, 0.9396926, 0.9396926, -0.32139382, 0.116977796, 0, 32.162754, -6.7865057)
+light_energy = 2.0
+light_angular_distance = 1.0
+shadow_enabled = true
+shadow_blur = 1.2
