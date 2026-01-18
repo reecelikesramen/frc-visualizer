@@ -1,0 +1,9 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = "4.2"
+
+[libraries]
+macos.debug = "res://bin/libnt4_logging.dylib"
+macos.release = "res://bin/libnt4_logging.dylib"
+macos.debug.arm64 = "res://bin/libnt4_logging.dylib"
+macos.release.arm64 = "res://bin/libnt4_logging.dylib"
