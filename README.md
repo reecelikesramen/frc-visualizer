@@ -9,7 +9,11 @@
 
 FRC Visualizer is built from the ground up to provide a smooth, low-latency interface for monitoring and analyzing robot data. By leveraging a **Godot 4** frontend and a **Rust-powered GDExtension** backend, it achieves unmatched performance and memory efficiency.
 
-![3D Field View](/images/demo1.mp4)
+
+
+https://github.com/user-attachments/assets/6778d1e1-385e-4a9e-b459-09bd17358f62
+
+
 <p align="center">
   <br>
   <em><strong>3D Field View:</strong> Shows game pieces, robot pose, swerve states, and the full UI.</em>
@@ -28,7 +32,11 @@ FRC Visualizer is built from the ground up to provide a smooth, low-latency inte
 
 ---
 
-![2D Field View](/images/demo2.mp4)
+
+
+https://github.com/user-attachments/assets/b0220c27-adfc-4961-8000-8c54b71ae9d1
+
+
 <p align="center">
   <br>
   <em><strong>2D Field View:</strong> Shows game pieces, robot pose, and swerve states in a top-down view.</em>
