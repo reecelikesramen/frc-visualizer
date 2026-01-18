@@ -86,7 +86,26 @@ jobs:
 
       - name: Build
         working-directory: nt4_logging
-        run: cargo zigbuild --release --target ${{ matrix.target }}
+        run: |
+          case ${{ matrix.target }} in
+            x86_64-pc-windows-gnu)
+              export CC="zig cc -target x86_64-windows-gnu"
+              export AR="zig ar"
+              ;;
+            aarch64-pc-windows-gnullvm)
+              export CC="zig cc -target aarch64-windows-gnu"
+              export AR="zig ar"
+              ;;
+            aarch64-apple-darwin)
+              export CC="zig cc -target aarch64-macos"
+              export AR="zig ar"
+              ;;
+            aarch64-unknown-linux-gnu)
+              export CC="zig cc -target aarch64-linux-gnu"
+              export AR="zig ar"
+              ;;
+          esac
+          cargo zigbuild --release --target ${{ matrix.target }}
 
       - name: Prepare Artifact
         run: |
