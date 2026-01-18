@@ -1,0 +1,19 @@
+[package]
+name = "nt4_logging"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+godot = { version = "0.4.5" }
+tokio = { version = "1.32", features = ["full"] }
+parking_lot = "0.12"
+byteorder = "1.5"
+log = "0.4"
+rmp-serde = "1.1"
+serde = { version = "1.0", features = ["derive"] }
+# structs not released on crates.io yet, need to target latest
+nt_client = { git = "https://github.com/DatAsianBoi123/nt_client", rev = "20f20e3570fd8080d65fb405865cc83bec58ce94", features = ["struct"] }
+rmpv = "1.3"

@@ -1,0 +1,205 @@
+name: Build and Export
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  GODOT_VERSION: 4.3
+  PROJECT_PATH: godot
+
+jobs:
+  build-rust-linux-windows:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: linux
+            arch: x86_64
+            name: libnt4_logging.so
+          - target: aarch64-unknown-linux-gnu
+            os: linux
+            arch: arm64
+            name: libnt4_logging.so
+          - target: x86_64-pc-windows-gnu
+            os: windows
+            arch: x86_64
+            name: nt4_logging.dll
+          - target: aarch64-pc-windows-gnullvm
+            os: windows
+            arch: arm64
+            name: nt4_logging.dll
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Cross
+        run: cargo install cross
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-index-
+
+      - name: Cache Cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-${{ matrix.target }}-
+
+      - name: Build
+        working-directory: nt4_logging
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Prepare Artifact
+        run: |
+          mkdir -p artifacts/${{ matrix.os }}/${{ matrix.arch }}
+          cp nt4_logging/target/${{ matrix.target }}/release/${{ matrix.name }} artifacts/${{ matrix.os }}/${{ matrix.arch }}/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-lib-${{ matrix.os }}-${{ matrix.arch }}
+          path: artifacts/${{ matrix.os }}/${{ matrix.arch }}/${{ matrix.name }}
+
+  build-rust-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-index-
+
+      - name: Cache Cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-darwin-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-darwin-
+
+      - name: Build
+        working-directory: nt4_logging
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Prepare Artifact
+        run: |
+          mkdir -p artifacts/macos/arm64
+          cp nt4_logging/target/aarch64-apple-darwin/release/libnt4_logging.dylib artifacts/macos/arm64/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-lib-macos-arm64
+          path: artifacts/macos/arm64/libnt4_logging.dylib
+
+  godot-export:
+    needs: [build-rust-linux-windows, build-rust-macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create bin directory
+        run: mkdir -p godot/bin
+
+      - name: Download Linux x64
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-lib-linux-x86_64
+          path: godot/bin
+
+      - name: Download Linux arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-lib-linux-arm64
+          path: godot/bin
+
+      - name: Download Windows x64
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-lib-windows-x86_64
+          path: godot/bin
+
+      - name: Download Windows arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-lib-windows-arm64
+          path: godot/bin
+
+      - name: Download MacOS arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-lib-macos-arm64
+          path: godot/bin
+
+      - name: Setup Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates
+          mv /root/.local/share/godot/templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+
+      - name: Build Windows Desktop
+        run: |
+          mkdir -p build/windows
+          godot --headless --verbose --export-release "Windows Desktop" build/windows/FRC_Visualization.exe
+
+      - name: Build Linux/X11
+        run: |
+          mkdir -p build/linux
+          godot --headless --verbose --export-release "Linux/X11" build/linux/FRC_Visualization.x86_64
+
+      - name: Build macOS
+        run: |
+          mkdir -p build/macos
+          godot --headless --verbose --export-release "macOS" build/macos/FRC_Visualization.zip
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: |
+            build/windows/FRC_Visualization.exe
+            build/linux/FRC_Visualization.x86_64
+            build/macos/FRC_Visualization.zip

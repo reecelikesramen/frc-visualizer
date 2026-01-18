@@ -225,9 +225,9 @@ func _update_complex_item(item: TreeItem, data: Variant, editable: bool, root_to
 			current.set_text(1, StructParser.format_value(elem_val, true))
 			current.set_editable(1, editable)
 			
-			current.set_metadata(0, root_topic)
+			# Store metadata in col 0 as dict to avoid col 2 usage
+			current.set_metadata(0, { "path": root_topic, "subpath": str(i) if path_prefix == "" else path_prefix + "/" + str(i) })
 			current.set_metadata(1, "array_elem")
-			current.set_metadata(2, str(i))
 			
 			if typeof(elem_val) == TYPE_DICTIONARY or typeof(elem_val) == TYPE_ARRAY:
 				_update_complex_item(current, elem_val, editable, root_topic, path_prefix + "/" + str(i))
@@ -247,6 +247,7 @@ func _update_complex_item(item: TreeItem, data: Variant, editable: bool, root_to
 		var existing_children = {}
 		var c = item.get_first_child()
 		while c:
+			# If we change text/keys, we might lose tracking, but usually keys are stable
 			existing_children[c.get_text(0)] = c
 			c = c.get_next()
 			
@@ -263,9 +264,9 @@ func _update_complex_item(item: TreeItem, data: Variant, editable: bool, root_to
 			child.set_text(1, StructParser.format_value(val, true))
 			child.set_editable(1, editable)
 			
-			child.set_metadata(0, root_topic)
+			# Store metadata in col 0 as dict
+			child.set_metadata(0, { "path": root_topic, "subpath": subpath })
 			child.set_metadata(1, "struct_field")
-			child.set_metadata(2, subpath) # Metadata index 2 is now safe
 			
 			if typeof(val) == TYPE_DICTIONARY or typeof(val) == TYPE_ARRAY:
 				_update_complex_item(child, val, editable, root_topic, subpath)
@@ -281,10 +282,19 @@ func _on_item_edited():
 	
 	var text = item.get_text(1)
 	var type = item.get_metadata(1)
-	var real_path = item.get_metadata(0)
+	var meta0 = item.get_metadata(0)
+	
+	var real_path = ""
+	var subpath = ""
+	
+	if typeof(meta0) == TYPE_DICTIONARY:
+		real_path = meta0.get("path", "")
+		subpath = meta0.get("subpath", "")
+	else:
+		real_path = str(meta0)
 	
 	if type == "struct_field":
-		var subpath = item.get_metadata(2)
+		# subpath is already extracted from meta0
 		var raw = nt.get_value(real_path, PackedByteArray())
 		if typeof(raw) != TYPE_PACKED_BYTE_ARRAY: return
 		
@@ -362,7 +372,13 @@ func _on_item_mouse_selected(pos, btn):
 				if id == 0:
 					txt = item.get_text(0)
 				if id == 1:
-					var path = item.get_metadata(0)
+					var meta0 = item.get_metadata(0)
+					var path = ""
+					if typeof(meta0) == TYPE_DICTIONARY:
+						path = meta0.get("path", "")
+					else:
+						path = str(meta0)
+						
 					if path:
 						var type = item.get_metadata(1)
 						if type == "struct_field" or type == "array_elem":
@@ -376,7 +392,12 @@ func _on_item_mouse_selected(pos, btn):
 							else:
 								txt = item.get_text(1)
 				if id == 2:
-					txt = item.get_metadata(0) if item.get_metadata(0) else item.get_text(0)
+					var meta0 = item.get_metadata(0)
+					if typeof(meta0) == TYPE_DICTIONARY:
+						txt = meta0.get("path", "")
+					else:
+						txt = str(meta0)
+					if txt == "": txt = item.get_text(0)
 				DisplayServer.clipboard_set(txt)
 			)
 			add_child(popup)
