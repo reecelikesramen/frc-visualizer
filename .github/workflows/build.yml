@@ -79,14 +79,24 @@ jobs:
       - name: Cache Cargo build
         uses: actions/cache@v3
         with:
-          path: target
+          path: nt4_logging/target
           key: ${{ runner.os }}-cargo-build-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ matrix.target }}-
 
+      - name: Setup MacOS SDK
+        if: contains(matrix.target, 'apple')
+        run: |
+          wget https://github.com/joseluisq/macosx-sdks/releases/download/12.3/MacOSX12.3.sdk.tar.xz
+          tar -xf MacOSX12.3.sdk.tar.xz
+
       - name: Build
         working-directory: nt4_logging
-        run: cargo zigbuild --release --target ${{ matrix.target }}
+        run: |
+          if [[ "${{ matrix.target }}" == *"apple"* ]]; then
+            export SDKROOT=$(pwd)/../MacOSX12.3.sdk
+          fi
+          cargo zigbuild --release --target ${{ matrix.target }}
 
       - name: Prepare Artifact
         run: |
