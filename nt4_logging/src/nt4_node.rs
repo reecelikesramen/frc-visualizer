@@ -38,12 +38,112 @@ impl NT4 {
     #[func]
     pub fn start_client(&mut self, server_ip: String) {
         godot_print!("NT4: start_client called with ip: {}", server_ip);
+
+        // Stop old thread and clear data
+        {
+            let mut store = self.store.write();
+            store.clear();
+        }
+
         self.server_ip = server_ip.clone();
+
+        // Get generation
+        let generation = self.store.read().generation;
+
         self.network = Some(NetworkManager::new(
             self.store.clone(),
             self.server_ip.clone(),
+            generation,
         ));
-        godot_print!("NT4: NetworkManager initialized.");
+        godot_print!("NT4: NetworkManager initialized (Gen: {}).", generation);
+    }
+
+    #[func]
+    pub fn disconnect(&mut self) {
+        godot_print!("NT4: Disconnecting...");
+        let mut store = self.store.write();
+        store.clear(); // Bumps generation, stopping the network thread
+        self.network = None; // Drop the manager (though thread lives until it checks gen)
+    }
+
+    #[func]
+    pub fn load_log_file(&mut self, path: String) -> bool {
+        godot_print!("NT4: Loading log file: {}", path);
+
+        // Stop old thread and clear data
+        {
+            let mut store = self.store.write();
+            store.clear();
+        }
+
+        use std::io::Read;
+        let mut content = Vec::new();
+        if let Err(e) = std::fs::File::open(&path).and_then(|mut f| f.read_to_end(&mut content)) {
+            godot_print!("Error reading file: {}", e);
+            return false;
+        }
+
+        // Parse Log using frclib-datalog
+        use frclib_core::value::FrcValue;
+        use frclib_datalog::DataLogReader;
+        use std::collections::HashMap;
+
+        let cursor = std::io::Cursor::new(content);
+        let reader = match DataLogReader::try_new(cursor, Default::default()) {
+            Ok(r) => r,
+            Err(e) => {
+                godot_print!("Error creating DataLogReader: {:?}", e);
+                return false;
+            }
+        };
+
+        let mut store = self.store.write();
+
+        let keys = reader.get_all_entry_keys();
+        for key in keys {
+            // Set type (use last known type)
+            let type_strs = reader.read_entry_type_str(key);
+            if let Some(ts) = type_strs.last() {
+                store.set_type(key.clone(), ts.value.clone());
+            }
+
+            // Values
+            let values = reader.read_entry(key);
+            for v in values {
+                let timestamp = v.timestamp as u64;
+                match &v.value {
+                    FrcValue::Double(val) => store.update_double(key.clone(), timestamp, *val),
+                    FrcValue::Boolean(val) => store.update_boolean(key.clone(), timestamp, *val),
+                    FrcValue::String(val) => {
+                        store.update_string(key.clone(), timestamp, val.to_string())
+                    }
+                    FrcValue::DoubleArray(val) => {
+                        store.update_double_array(key.clone(), timestamp, val.to_vec())
+                    }
+                    FrcValue::BooleanArray(val) => {
+                        store.update_boolean_array(key.clone(), timestamp, val.to_vec())
+                    }
+                    FrcValue::StringArray(val) => {
+                        let vec: Vec<String> = val.iter().map(|s| s.to_string()).collect();
+                        store.update_string_array(key.clone(), timestamp, vec)
+                    }
+                    FrcValue::Raw(val) => store.update_raw(key.clone(), timestamp, val.to_vec()),
+                    _ => {
+                        // Attempt to cast other types if needed, or ignore
+                        // Int/Float/etc might exist in FrcValue
+                        if let FrcValue::Int(i) = v.value {
+                            // Assuming generic number as double
+                            store.update_double(key.clone(), timestamp, i as f64);
+                        } else if let FrcValue::Float(f) = v.value {
+                            store.update_double(key.clone(), timestamp, f as f64);
+                        }
+                    }
+                }
+            }
+        }
+
+        godot_print!("Log file loaded. Topics: {}", store.data.len());
+        true
     }
 
     #[func]
@@ -181,9 +281,9 @@ impl NT4 {
     }
 
     #[func]
-    pub fn get_boolean_series(&self, topic: String) -> Dictionary {
+    pub fn get_boolean_series(&self, topic: String) -> VarDictionary {
         let store = self.store.read();
-        let mut dict = Dictionary::new();
+        let mut dict = VarDictionary::new();
 
         if let Some((ts, vals)) = store.get_boolean_series(&topic) {
             let mut ts_array = Array::new();

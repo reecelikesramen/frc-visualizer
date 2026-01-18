@@ -28,6 +28,23 @@ func _process(delta: float) -> void:
 	transform = transform.interpolate_with(target_pose, SMOOTH_SPEED * delta)
 
 func valid_nt_update():
-	# Pass 'target_pose' as the default to avoid snapping to 0,0,0 on frame loss
-	var new_pose = nt_instance.get_pose3d(topic_path, target_pose)
-	target_pose = new_pose
+	# Check for Pose2d vs Pose3d based on data size
+	var val = nt_instance.get_value(topic_path, null)
+	
+	if val is PackedByteArray and val.size() == 24:
+		# Pose2d (24 bytes) -> Convert to 3D
+		# get_pose2d returns Godot 2D: x=FRC_X, y=-FRC_Y, rot=-FRC_Theta
+		var p2d = nt_instance.get_pose2d(topic_path, Transform2D())
+		
+		# Map to Godot 3D:
+		# X = -FRC_Y = p2d.origin.y
+		# Z = -FRC_X = -p2d.origin.x
+		# Yaw = FRC_Theta = -p2d.rotation
+		var x = p2d.origin.y
+		var z = - p2d.origin.x
+		var yaw = - p2d.get_rotation()
+		
+		target_pose = Transform3D(Basis(Vector3.UP, yaw), Vector3(x, 0.0, z))
+	else:
+		# Default to Pose3d
+		target_pose = nt_instance.get_pose3d(topic_path, target_pose)

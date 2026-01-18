@@ -12,8 +12,8 @@ pub struct NetworkManager {
 }
 
 impl NetworkManager {
-    pub fn new(_store: Arc<RwLock<LogStore>>, server_ip: String) -> Self {
-        godot_print!("nm: Initializing NetworkManager...");
+    pub fn new(_store: Arc<RwLock<LogStore>>, server_ip: String, generation: u32) -> Self {
+        godot_print!("nm: Initializing NetworkManager... (Gen: {})", generation);
 
         let store_clone = _store.clone();
 
@@ -94,6 +94,10 @@ impl NetworkManager {
                                         }
 
                                         let mut store = store_clone.write();
+                                        if !store.check_generation(generation) {
+                                            godot_print!("nm: Generation mismatch ({} vs {}). Stopping thread.", store.generation, generation);
+                                            break;
+                                        }
 
                                         // 1. Handle Schema Definitions
                                         if topic_name.starts_with("/.schema/") {

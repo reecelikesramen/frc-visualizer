@@ -15,7 +15,8 @@ var server_ip = "127.0.0.1"
 
 func _ready():
 	add_child(nt)
-	nt.start_client(server_ip)
+	# nt.start_client(server_ip) # Disabled autoconnect
+
 	nt.subscribe_to_all()
 	
 	if OS.get_name() == "macOS":
@@ -97,7 +98,27 @@ func _on_search_text_changed(new_text):
 
 func _apply_filter(filter_text: String):
 	var root = topic_map["/"]
-	_recursive_filter(root, filter_text.to_lower())
+	if not root: return
+	
+	var filter = filter_text.to_lower()
+	_recursive_filter(root, filter)
+
+func clear_tree():
+	tree.clear()
+	topic_map.clear()
+	tuning_map.clear()
+	
+	# Re-create Roots
+	var root = tree.create_item()
+	root.set_text(0, "/")
+	topic_map["/"] = root
+	
+	tuning_root_item = tree.create_item(root)
+	tuning_root_item.set_text(0, "Tuning")
+	tuning_root_item.set_selectable(0, false)
+	tuning_map[""] = tuning_root_item
+	tuning_root_item.visible = false
+
 
 func _recursive_filter(item: TreeItem, filter: String) -> bool:
 	var visible = false
@@ -226,7 +247,7 @@ func _update_complex_item(item: TreeItem, data: Variant, editable: bool, root_to
 			current.set_editable(1, editable)
 			
 			# Store metadata in col 0 as dict to avoid col 2 usage
-			current.set_metadata(0, { "path": root_topic, "subpath": str(i) if path_prefix == "" else path_prefix + "/" + str(i) })
+			current.set_metadata(0, {"path": root_topic, "subpath": str(i) if path_prefix == "" else path_prefix + "/" + str(i)})
 			current.set_metadata(1, "array_elem")
 			
 			if typeof(elem_val) == TYPE_DICTIONARY or typeof(elem_val) == TYPE_ARRAY:
@@ -265,7 +286,7 @@ func _update_complex_item(item: TreeItem, data: Variant, editable: bool, root_to
 			child.set_editable(1, editable)
 			
 			# Store metadata in col 0 as dict
-			child.set_metadata(0, { "path": root_topic, "subpath": subpath })
+			child.set_metadata(0, {"path": root_topic, "subpath": subpath})
 			child.set_metadata(1, "struct_field")
 			
 			if typeof(val) == TYPE_DICTIONARY or typeof(val) == TYPE_ARRAY:

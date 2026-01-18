@@ -51,6 +51,7 @@ impl TopicData {
 pub struct LogStore {
     pub data: HashMap<String, TopicData>,
     pub topic_types: HashMap<String, String>,
+    pub generation: u32,
 }
 
 impl LogStore {
@@ -58,11 +59,22 @@ impl LogStore {
         Self {
             data: HashMap::new(),
             topic_types: HashMap::new(),
+            generation: 0,
         }
     }
 
     pub fn set_type(&mut self, topic: String, type_str: String) {
         self.topic_types.insert(topic, type_str);
+    }
+
+    pub fn clear(&mut self) {
+        self.data.clear();
+        self.topic_types.clear();
+        self.generation += 1;
+    }
+
+    pub fn check_generation(&self, generation: u32) -> bool {
+        self.generation == generation
     }
 
     pub fn has_topic(&self, topic: &str) -> bool {

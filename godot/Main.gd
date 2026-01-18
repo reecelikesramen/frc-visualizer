@@ -18,10 +18,19 @@ var current_tab_idx = 0
 # Cache for monitored topics per tab: tab_idx (int) -> Array[Dictionary]
 var monitored_topics_cache = {}
 
+var menu_bar: MenuBar
+var file_menu: PopupMenu
+var connect_dialog: AcceptDialog
+var team_num_edit: LineEdit
+var file_dialog: FileDialog
+
 func _ready():
-	# Wire up dependencies
+	# Wired up dependencies
 	var nt = nt_tree_view.nt
 	topic_dock.set_nt_instance(nt)
+	
+	_setup_menus()
+
 	
 	# Connect TabBar
 	tab_bar.tab_changed.connect(_on_tab_changed)
@@ -163,3 +172,74 @@ func load_ui_state():
 			v_split.split_offset = data.v_split_offset
 	else:
 		print("No saved UI state found.")
+
+func _setup_menus():
+	menu_bar = MenuBar.new()
+	menu_bar.name = "MenuBar"
+	menu_bar.prefer_global_menu = true
+	add_child(menu_bar)
+
+	file_menu = PopupMenu.new()
+	file_menu.name = "File"
+	menu_bar.add_child(file_menu)
+	
+	file_menu.add_item("Connect to Simulator", 1)
+	file_menu.add_item("Connect to Robot...", 2)
+	file_menu.add_item("Load Log File...", 3)
+	file_menu.id_pressed.connect(_on_file_menu_item)
+	
+	# Dialogs
+	connect_dialog = AcceptDialog.new()
+	connect_dialog.title = "Connect to Robot"
+	
+	var vbox = VBoxContainer.new()
+	connect_dialog.add_child(vbox)
+	
+	var label = Label.new()
+	label.text = "Enter Team Number:"
+	vbox.add_child(label)
+	
+	team_num_edit = LineEdit.new()
+	team_num_edit.placeholder_text = "e.g. 3538"
+	team_num_edit.custom_minimum_size.x = 200
+	vbox.add_child(team_num_edit)
+	
+	connect_dialog.confirmed.connect(_on_connect_confirmed)
+	add_child(connect_dialog)
+	
+	file_dialog = FileDialog.new()
+	file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	file_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	file_dialog.filters = ["*.wpilog ; WPILog Files", "*.datalog ; DataLog Files"]
+	file_dialog.file_selected.connect(_on_log_file_selected)
+	file_dialog.title = "Open Log File"
+	file_dialog.min_size = Vector2(600, 400)
+	add_child(file_dialog)
+
+func _on_file_menu_item(id):
+	if id == 1:
+		# Connect Simulator
+		nt_tree_view.clear_tree()
+		nt_tree_view.nt.start_client("127.0.0.1")
+	elif id == 2:
+		# Connect Robot
+		connect_dialog.popup_centered()
+		team_num_edit.grab_focus()
+	elif id == 3:
+		# Load Log
+		file_dialog.popup_centered_ratio(0.6)
+
+func _on_connect_confirmed():
+	var txt = team_num_edit.text
+	if txt.is_valid_int():
+		var team = int(txt)
+		var ip = "10.%d.%d.2" % [team / 100, team % 100]
+		print("Connecting to Robot IP: ", ip)
+		nt_tree_view.clear_tree()
+		nt_tree_view.nt.start_client(ip)
+	else:
+		print("Invalid Team Number")
+
+func _on_log_file_selected(path):
+	nt_tree_view.clear_tree()
+	nt_tree_view.nt.load_log_file(path)
