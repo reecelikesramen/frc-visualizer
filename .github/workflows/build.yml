@@ -1,5 +1,8 @@
 name: Build and Export
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: ["main"]
@@ -134,6 +137,8 @@ jobs:
       image: barichello/godot-ci:4.3
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Create bin directory
         run: mkdir -p godot/bin
