@@ -2,7 +2,7 @@
 
 **High-performance, next-generation visualization for FIRST Robotics Competition data.**
 
-[![Build and Export](https://github.com/reecelikesramen/frc-visualization/actions/workflows/build.yml/badge.svg)](https://github.com/reecelikesramen/frc-visualization/actions/workflows/build.yml)
+[![Build and Export](https://github.com/reecelikesramen/frc-visualizer/actions/workflows/build.yml/badge.svg)](https://github.com/reecelikesramen/frc-visualizer/actions/workflows/build.yml)
 [![Godot](https://img.shields.io/badge/Godot-4.3+-478CBF?logo=godot-engine&logoColor=white)](https://godotengine.org)
 [![Rust](https://img.shields.io/badge/Rust-2024-000000?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
