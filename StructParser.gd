@@ -59,7 +59,7 @@ static func get_struct_size(type: String) -> int:
 
 static func parse_pose3d(data: PackedByteArray) -> Variant:
 	if data.size() < 56: return null
-	var arr = data.to_float64_array() 
+	var arr = data.to_float64_array()
 	var tx = arr[0]; var ty = arr[1]; var tz = arr[2]
 	var qw = arr[3]; var qx = arr[4]; var qy = arr[5]; var qz = arr[6]
 	var origin = Vector3(-ty, tz, -tx)
@@ -72,7 +72,7 @@ static func parse_pose2d(data: PackedByteArray) -> Variant:
 	var ty = data.decode_double(8)
 	var rot = data.decode_double(16)
 	var pos = Vector2(tx, -ty)
-	var godot_rot = -rot
+	var godot_rot = - rot
 	return Transform2D(godot_rot, pos)
 
 static func parse_translation3d(data: PackedByteArray) -> Variant:
@@ -193,8 +193,8 @@ static func format_value(val: Variant, short: bool = false) -> String:
 	elif typeof(val) == TYPE_VECTOR3:
 		if short: return "Translation3d"
 		# Godot -> FRC
-		var frc_x = -val.z
-		var frc_y = -val.x
+		var frc_x = - val.z
+		var frc_y = - val.x
 		var frc_z = val.y
 		var fmt = "%.4f" if short else "%.2f"
 		return ("(" + fmt + ", " + fmt + ", " + fmt + ")") % [frc_x, frc_y, frc_z]
@@ -206,8 +206,8 @@ static func format_value(val: Variant, short: bool = false) -> String:
 	elif typeof(val) == TYPE_QUATERNION:
 		if short: return "Rotation3d"
 		# Godot -> FRC
-		var frc_x = -val.z
-		var frc_y = -val.x
+		var frc_x = - val.z
+		var frc_y = - val.x
 		var frc_z = val.y
 		var frc_w = val.w
 		return "Quat(%.2f, %.2f, %.2f, %.2f)" % [frc_x, frc_y, frc_z, frc_w]
@@ -227,7 +227,7 @@ static func to_dictionary(val: Variant) -> Variant:
 		var frc_y = -o.x
 		var frc_z = o.y
 		
-		var trans = { "x": frc_x, "y": frc_y, "z": frc_z, "_type": "Translation3d" }
+		var trans = {"x": frc_x, "y": frc_y, "z": frc_z, "_type": "Translation3d"}
 		
 		# Rotation breakdown
 		var r = val.basis.get_euler()
@@ -236,12 +236,12 @@ static func to_dictionary(val: Variant) -> Variant:
 		# Convert Quat
 		var frc_qx = -q.z
 		var frc_qy = -q.x
-		var frc_qz = q.y 
+		var frc_qz = q.y
 		var frc_qw = q.w
 		
 		var rot = {
-			"Quaternion": { "x": frc_qx, "y": frc_qy, "z": frc_qz, "w": frc_qw, "_type": "Quaternion" },
-			"Euler": { "roll": rad_to_deg(r.x), "pitch": rad_to_deg(r.y), "yaw": rad_to_deg(r.z), "_type": "Euler" },
+			"Quaternion": {"x": frc_qx, "y": frc_qy, "z": frc_qz, "w": frc_qw, "_type": "Quaternion"},
+			"Euler": {"roll": rad_to_deg(r.z), "pitch": rad_to_deg(r.x), "yaw": rad_to_deg(r.y), "_type": "Euler"},
 			"_type": "Rotation3d"
 		}
 		
@@ -254,29 +254,29 @@ static func to_dictionary(val: Variant) -> Variant:
 		var o = val.origin
 		var r = val.get_rotation()
 		return {
-			"Translation": { "x": o.x, "y": o.y, "_type": "Translation2d" },
-			"Rotation": { "deg": rad_to_deg(r), "rad": r, "_type": "Rotation2d" },
+			"Translation": {"x": o.x, "y": o.y, "_type": "Translation2d"},
+			"Rotation": {"deg": rad_to_deg(r), "rad": r, "_type": "Rotation2d"},
 			"_type": "Pose2d"
 		}
 	elif typeof(val) == TYPE_VECTOR3:
 		# Godot -> FRC
-		var frc_x = -val.z
-		var frc_y = -val.x
+		var frc_x = - val.z
+		var frc_y = - val.x
 		var frc_z = val.y
-		return { "x": frc_x, "y": frc_y, "z": frc_z, "_type": "Translation3d" }
+		return {"x": frc_x, "y": frc_y, "z": frc_z, "_type": "Translation3d"}
 	elif typeof(val) == TYPE_VECTOR2:
-		return { "x": val.x, "y": val.y, "_type": "Translation2d" }
+		return {"x": val.x, "y": val.y, "_type": "Translation2d"}
 	elif typeof(val) == TYPE_QUATERNION:
 		var r = val.get_euler()
 		
-		var frc_qx = -val.z
-		var frc_qy = -val.x
-		var frc_qz = val.y 
+		var frc_qx = - val.z
+		var frc_qy = - val.x
+		var frc_qz = val.y
 		var frc_qw = val.w
 		
 		return {
-			"Quaternion": { "x": frc_qx, "y": frc_qy, "z": frc_qz, "w": frc_qw, "_type": "Quaternion" },
-			"Euler": { "roll": rad_to_deg(r.x), "pitch": rad_to_deg(r.y), "yaw": rad_to_deg(r.z), "_type": "Euler" },
+			"Quaternion": {"x": frc_qx, "y": frc_qy, "z": frc_qz, "w": frc_qw, "_type": "Quaternion"},
+			"Euler": {"roll": rad_to_deg(r.z), "pitch": rad_to_deg(r.x), "yaw": rad_to_deg(r.y), "_type": "Euler"},
 			"_type": "Rotation3d"
 		}
 	elif typeof(val) == TYPE_ARRAY or \
@@ -368,7 +368,7 @@ static func encode_struct(val: Variant, type: String) -> PackedByteArray:
 			var fqw = q.w
 			var fqx = -q.z
 			var fqy = -q.x
-			var fqz = q.y 
+			var fqz = q.y
 			
 			bytes.encode_double(24, fqw)
 			bytes.encode_double(32, fqx)

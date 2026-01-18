@@ -18,6 +18,8 @@ func _ready():
 	# For now, we wait for the first drop or main to set it.
 	# Add to group for updates
 	add_to_group("dock_updates")
+	# Make sure the dock has a reasonable minimum size
+	custom_minimum_size = Vector2(300, 200)
 	pass
 
 func set_nt_instance(nt_node):
@@ -85,6 +87,7 @@ func _on_visualization_requested(path: String, type: String, viz_type: String):
 	if viz_type == "none":
 		remove_visualizer(path)
 		_notify_change()
+		_update_field_background_state()
 		return
 		
 	if active_visualizers.has(path):
@@ -97,6 +100,7 @@ func _on_visualization_requested(path: String, type: String, viz_type: String):
 
 	add_visualizer(path, viz_type, type)
 	_notify_change()
+	_update_field_background_state()
 
 func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 	if not nt_instance_ref:
@@ -104,14 +108,20 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 		return
 
 	# 1. Resolve Parent
-	# TODO: In 2D mode, we might need a different parent hierarchy or rendering surface.
-	# For now we use the same structure but validation prevents invalid types.
 	var main = OwnerUtils.get_main(self)
-	var parent = main.get_node_or_null("RobotParent")
-	if not parent:
-		parent = Node3D.new()
-		parent.name = "RobotParent"
-		main.add_child(parent)
+	var parent = null
+	
+	if current_mode == "2D":
+		parent = main.get_node_or_null("HSplitContainer/RightSide/VSplitContainer/ViewContainer/Field2D")
+		if not parent:
+			push_warning("TopicDock: Field2D not found in 2D mode")
+			return
+	else:
+		parent = main.get_node_or_null("RobotParent")
+		if not parent:
+			parent = Node3D.new()
+			parent.name = "RobotParent"
+			main.add_child(parent)
 
 	var context = {
 		"viz_type": viz_type,
@@ -166,22 +176,42 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 	
 	match viz_type:
 		"Robot":
-			viz_node = Node3D.new()
-			viz_node.set_script(load("res://visualizers/RobotVisualizer.gd"))
-			# Default debug mesh
-			var mesh_inst = MeshInstance3D.new()
-			mesh_inst.mesh = BoxMesh.new()
-			mesh_inst.mesh.size = Vector3(0.5, 0.5, 0.5)
-			viz_node.add_child(mesh_inst)
+			if current_mode == "2D":
+				viz_node = Node2D.new()
+				viz_node.set_script(load("res://visualizers/RobotVisualizer2D.gd"))
+			else:
+				viz_node = Node3D.new()
+				viz_node.set_script(load("res://visualizers/RobotVisualizer.gd"))
+				# Default debug mesh
+				var mesh_inst = MeshInstance3D.new()
+				mesh_inst.mesh = BoxMesh.new()
+				mesh_inst.mesh.size = Vector3(0.5, 0.5, 0.5)
+				viz_node.add_child(mesh_inst)
 			
 		"Game Piece":
-			viz_node = MultiMeshInstance3D.new()
-			viz_node.set_script(load("res://visualizers/GamePieceVisualizer.gd"))
+			if current_mode == "2D":
+				viz_node = Node2D.new()
+				viz_node.set_script(load("res://visualizers/GamePieceVisualizer2D.gd"))
+			else:
+				viz_node = MultiMeshInstance3D.new()
+				viz_node.set_script(load("res://visualizers/GamePieceVisualizer.gd"))
 			
 		"Swerve States":
-			viz_node = Node3D.new()
-			viz_node.set_script(load("res://visualizers/SwerveStateVisualizer.gd"))
+			if current_mode == "2D":
+				viz_node = Node2D.new()
+				viz_node.set_script(load("res://visualizers/SwerveStateVisualizer2D.gd"))
+			else:
+				viz_node = Node3D.new()
+				viz_node.set_script(load("res://visualizers/SwerveStateVisualizer.gd"))
 			
+		"Trajectory":
+			if current_mode == "2D":
+				viz_node = Node2D.new()
+				viz_node.set_script(load("res://visualizers/PathVisualizer2D.gd"))
+			else:
+				# 3D Trajectory implementation would go here (already handled by generic or specific)
+				viz_node = Node3D.new()
+				
 		_:
 			# Generic/Placeholder for unimplemented types from Registry
 			print("TopicDock: Using generic visualizer placeholder for ", viz_type)
@@ -203,6 +233,7 @@ func remove_visualizer(path: String):
 		if is_instance_valid(info.node):
 			info.node.queue_free()
 		active_visualizers.erase(path)
+		_update_field_background_state()
 
 var suppress_notify = false
 
@@ -224,6 +255,7 @@ func clear_topics():
 		child.free()
 		
 	suppress_notify = false
+	_update_field_background_state()
 	print("TopicDock: clear_topics finished. Children count: ", container.get_child_count())
 
 
@@ -279,6 +311,7 @@ func _find_row_by_path(path: String, parent_node: Node) -> Node:
 func restore_topics(list: Array[Dictionary], nt_node):
 	nt_instance_ref = nt_node
 	_restore_topics_recursive(list, container, nt_node)
+	_update_field_background_state()
 
 func _restore_topics_recursive(list: Array, parent_node: Node, nt_node: Node):
 	for item in list:
@@ -311,6 +344,21 @@ func _notify_change():
 	# Signal up to main/persistence manager to save
 	if OwnerUtils.get_main(self).has_method("save_ui_state"):
 		OwnerUtils.get_main(self).save_ui_state()
+		
+func _update_field_background_state():
+	if current_mode != "2D":
+		return
+		
+	var has_game_piece = false
+	for path in active_visualizers:
+		if active_visualizers[path]["type"] == "Game Piece":
+			has_game_piece = true
+			break
+			
+	var main = OwnerUtils.get_main(self)
+	var field = main.get_node_or_null("HSplitContainer/RightSide/VSplitContainer/ViewContainer/Field2D")
+	if field and field.has_method("set_game_pieces_visible"):
+		field.set_game_pieces_visible(has_game_piece)
 		
 class OwnerUtils:
 	static func get_main(node: Node) -> Node:

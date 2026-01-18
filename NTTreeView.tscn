@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://b8x6c8x7eax0"]
 
-[ext_resource type="Script" uid="uid://c5gawqj6chck4" path="res://NTTreeView.gd" id="1_script"]
-[ext_resource type="Script" path="res://DraggableTree.gd" id="2_dragtree"]
+[ext_resource type="Script" uid="uid://c8105vt1j66y7" path="res://NTTreeView.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://brxr2q542ycuw" path="res://DraggableTree.gd" id="2_dragtree"]
 
 [node name="NTTreeView" type="Control"]
 layout_mode = 3
@@ -27,6 +27,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-columns = 3
+columns = 2
 column_titles_visible = true
 script = ExtResource("2_dragtree")

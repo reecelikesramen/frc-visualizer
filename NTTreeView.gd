@@ -11,7 +11,7 @@ var saved_expansion_set = {} # Path -> bool
 var tuning_root_item: TreeItem = null
 var tuning_map = {} # RelPath -> TreeItem
 
-var server_ip = "127.0.0.1" 
+var server_ip = "127.0.0.1"
 
 func _ready():
 	add_child(nt)
@@ -20,6 +20,9 @@ func _ready():
 	
 	if OS.get_name() == "macOS":
 		get_window().content_scale_factor = 1.5
+	
+	# Minimum Size for TreeView Area
+	custom_minimum_size = Vector2(300, 300)
 	
 	# --- Dynamic UI Setup (Search Bar) ---
 	var panel = $Panel
@@ -42,11 +45,11 @@ func _ready():
 	tree = old_tree
 	
 	# Setup Tree
-	tree.columns = 3 # FIX: Changed to 3 to support metadata(2)
+	tree.columns = 2 # Fixed: 2 Columns as requested
 	tree.set_column_title(0, "Path")
 	tree.set_column_title(1, "Value")
 	tree.set_column_titles_visible(true)
-	tree.hide_root = true 
+	tree.hide_root = true
 	
 	# Enable interaction
 	tree.allow_rmb_select = true
@@ -117,7 +120,7 @@ func _recursive_filter(item: TreeItem, filter: String) -> bool:
 
 func _process(delta):
 	update_timer += delta
-	if update_timer > 0.033: 
+	if update_timer > 0.033:
 		update_timer = 0.0
 		_refresh_tree()
 
@@ -146,11 +149,11 @@ func _refresh_tree():
 			var rel_path = topic_name.replace("/AdvantageKit/NetworkInputs/Tuning/", "")
 			var tuning_item = _get_or_create_tuning_item(rel_path)
 			
-			tuning_item.set_metadata(0, topic_name) 
+			tuning_item.set_metadata(0, topic_name)
 			_update_item_value(tuning_item, topic_name, topic_type, true, "")
 		
 		# Also check if the raw input topic exists to enable the folder?
-		if topic_name == "/AdvantageKit/NetworkInputs/Tuning": 
+		if topic_name == "/AdvantageKit/NetworkInputs/Tuning":
 			if tuning_root_item: tuning_root_item.visible = true
 
 func _update_item_value(item: TreeItem, topic_name: String, topic_type: String, editable: bool, struct_subpath: String):
@@ -165,7 +168,7 @@ func _update_item_value(item: TreeItem, topic_name: String, topic_type: String, 
 		var bytes = nt.get_value(topic_name, PackedByteArray())
 		if typeof(bytes) == TYPE_PACKED_BYTE_ARRAY:
 			var parsed = StructParser.parse_packet(bytes, topic_type)
-			val_str = StructParser.format_value(parsed, true) 
+			val_str = StructParser.format_value(parsed, true)
 			raw_val = parsed # FIX: Use PARSED value for dictionary recursion
 		else:
 			val_str = "struct..."
@@ -185,7 +188,8 @@ func _update_item_value(item: TreeItem, topic_name: String, topic_type: String, 
 		if topic_type == "double[]":
 			raw_val = nt.get_number_array(topic_name, PackedFloat64Array())
 		elif topic_type == "boolean[]":
-			raw_val = nt.get_boolean_array(topic_name, [])
+			var default_arr: Array[bool] = []
+			raw_val = nt.get_boolean_array(topic_name, default_arr)
 		elif topic_type == "string[]":
 			raw_val = nt.get_string_array(topic_name, PackedStringArray())
 			
@@ -198,7 +202,7 @@ func _update_item_value(item: TreeItem, topic_name: String, topic_type: String, 
 	item.set_editable(1, editable)
 	
 	# Verify complex children
-	if raw_val != null and (struct_subpath == ""): 
+	if raw_val != null and (struct_subpath == ""):
 		var complex_data = StructParser.to_dictionary(raw_val)
 		if typeof(complex_data) == TYPE_DICTIONARY or typeof(complex_data) == TYPE_ARRAY:
 			_update_complex_item(item, complex_data, editable, topic_name)
@@ -213,7 +217,7 @@ func _update_complex_item(item: TreeItem, data: Variant, editable: bool, root_to
 			if current == null:
 				current = item.create_child()
 				current.set_text(0, str(i))
-				current.collapsed = true 
+				current.collapsed = true
 			else:
 				current.set_text(0, str(i))
 				
@@ -223,7 +227,7 @@ func _update_complex_item(item: TreeItem, data: Variant, editable: bool, root_to
 			
 			current.set_metadata(0, root_topic)
 			current.set_metadata(1, "array_elem")
-			current.set_metadata(2, str(i)) 
+			current.set_metadata(2, str(i))
 			
 			if typeof(elem_val) == TYPE_DICTIONARY or typeof(elem_val) == TYPE_ARRAY:
 				_update_complex_item(current, elem_val, editable, root_topic, path_prefix + "/" + str(i))
@@ -259,8 +263,8 @@ func _update_complex_item(item: TreeItem, data: Variant, editable: bool, root_to
 			child.set_text(1, StructParser.format_value(val, true))
 			child.set_editable(1, editable)
 			
-			child.set_metadata(0, root_topic) 
-			child.set_metadata(1, "struct_field") 
+			child.set_metadata(0, root_topic)
+			child.set_metadata(1, "struct_field")
 			child.set_metadata(2, subpath) # Metadata index 2 is now safe
 			
 			if typeof(val) == TYPE_DICTIONARY or typeof(val) == TYPE_ARRAY:
@@ -355,9 +359,9 @@ func _on_item_mouse_selected(pos, btn):
 			popup.add_item("Copy Path", 2)
 			popup.id_pressed.connect(func(id):
 				var txt = ""
-				if id==0: 
+				if id == 0:
 					txt = item.get_text(0)
-				if id==1: 
+				if id == 1:
 					var path = item.get_metadata(0)
 					if path:
 						var type = item.get_metadata(1)
@@ -371,7 +375,7 @@ func _on_item_mouse_selected(pos, btn):
 								txt = JSON.stringify(dict, "  ")
 							else:
 								txt = item.get_text(1)
-				if id==2: 
+				if id == 2:
 					txt = item.get_metadata(0) if item.get_metadata(0) else item.get_text(0)
 				DisplayServer.clipboard_set(txt)
 			)

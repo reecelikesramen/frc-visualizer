@@ -25,6 +25,12 @@ const MODULE_POSITIONS = [
 	Vector3(MODULE_OFFSET, 0, MODULE_OFFSET) # BR (Godot: +X, +Z)
 ]
 
+const SMOOTH_SPEED = 30.0
+# State tracking for smoothing
+var current_angles: Array[float] = [0.0, 0.0, 0.0, 0.0]
+var current_speeds: Array[float] = [0.0, 0.0, 0.0, 0.0]
+
+
 # Map strings to Standard Position Indices
 const QUADRANT_NAMES = ["FL", "FR", "BL", "BR"]
 
@@ -138,16 +144,26 @@ func _process(_delta: float) -> void:
 	if typeof(raw) == TYPE_PACKED_BYTE_ARRAY and raw.size() > 0:
 		var data = StructParser.parse_packet(raw, "struct:SwerveModuleState[]")
 		if typeof(data) == TYPE_ARRAY and data.size() >= 4:
-			_update_visuals(data)
+			_process_smoothing(data, _delta)
+			_update_visuals()
 
-func _update_visuals(states: Array):
+func _process_smoothing(target_states: Array, delta: float):
 	for viz_idx in range(4):
 		var data_idx = arrangement_map[viz_idx]
-		if data_idx >= states.size(): continue
+		if data_idx >= target_states.size(): continue
 		
-		var state = states[data_idx]
-		var angle = state.get("angle", 0.0)
-		var speed = state.get("speed", 0.0)
+		var state = target_states[data_idx]
+		var target_angle = state.get("angle", 0.0)
+		var target_speed = state.get("speed", 0.0)
+		
+		# Interpolate
+		current_angles[viz_idx] = lerp_angle(current_angles[viz_idx], target_angle, SMOOTH_SPEED * delta)
+		current_speeds[viz_idx] = lerp(current_speeds[viz_idx], target_speed, SMOOTH_SPEED * delta)
+
+func _update_visuals():
+	for viz_idx in range(4):
+		var angle = current_angles[viz_idx]
+		var speed = current_speeds[viz_idx]
 		
 		var arrow = arrows[viz_idx]
 		

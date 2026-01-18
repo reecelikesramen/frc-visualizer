@@ -204,7 +204,8 @@ func _fetch_value() -> String:
 	elif topic_type == "string[]":
 		return StructParser.format_value(nt_instance.get_string_array(topic_path, PackedStringArray()), false)
 	elif topic_type == "boolean[]":
-		return StructParser.format_value(nt_instance.get_boolean_array(topic_path, []), false)
+		var default_arr: Array[bool] = []
+		return StructParser.format_value(nt_instance.get_boolean_array(topic_path, default_arr), false)
 	# Add other types as needed
 	return "..."
 

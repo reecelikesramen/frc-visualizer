@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3 uid="uid://b37igovglwinu"]
+[gd_scene load_steps=17 format=3 uid="uid://b37igovglwinu"]
 
 [ext_resource type="Script" uid="uid://clls3330y86lk" path="res://Main.gd" id="1_272bh"]
 [ext_resource type="PackedScene" uid="uid://cbfhfk2kvrvni" path="res://fields/rebuilt/assets/rebuilt_import.scn" id="1_ig7tw"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://456458rr87sj" path="res://Field2D.gd" id="4_field2d"]
 [ext_resource type="PackedScene" uid="uid://b0d8x7483rjrp" path="res://TopicDock.tscn" id="5_topicdock"]
 [ext_resource type="ArrayMesh" uid="uid://cm41flj20561y" path="res://fields/rebuilt/assets/collision/bump.obj" id="6_7mycd"]
+[ext_resource type="Texture2D" uid="uid://b18ah1fnlaw7m" path="res://fields/rebuilt/assets/field_with_fuel.png" id="6_ycdy4"]
 [ext_resource type="ArrayMesh" uid="uid://bljrl02d8hyec" path="res://fields/rebuilt/assets/collision/hub.obj" id="7_efxa6"]
 [ext_resource type="ArrayMesh" uid="uid://bgok0t2ewieno" path="res://fields/rebuilt/assets/collision/tower.obj" id="8_dg77c"]
 [ext_resource type="ArrayMesh" uid="uid://cb6ci3ddffj5c" path="res://fields/rebuilt/assets/collision/trench_fixed.obj" id="9_ycdy4"]
@@ -33,8 +34,6 @@ transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(-0.99635875, 0.0034647742, -0.08518996, -0.018174686, 0.96757776, 0.25191867, 0.083300754, 0.25254968, -0.9639915, -2.0244346, 5.2732444, -12.241826)
 script = ExtResource("2_7mycd")
-
-[node name="ReflectionProbe" type="ReflectionProbe" parent="Camera3D"]
 
 [node name="HSplitContainer" type="HSplitContainer" parent="."]
 anchors_preset = 15
@@ -73,6 +72,7 @@ mouse_filter = 2
 visible = false
 layout_mode = 2
 script = ExtResource("4_field2d")
+field_image = ExtResource("6_ycdy4")
 
 [node name="TopicDock" parent="HSplitContainer/RightSide/VSplitContainer" instance=ExtResource("5_topicdock")]
 layout_mode = 2

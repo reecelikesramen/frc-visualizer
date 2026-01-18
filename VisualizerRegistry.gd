@@ -182,6 +182,12 @@ const RULES_2D = {
 		"options": {
 			"Position": ["Center", "Back", "Front"]
 		}
+	},
+	"Game Piece": {
+		"sources": ["Pose3d", "Pose3d[]", "Transform3d", "Transform3d[]", "Translation3d", "Translation3d[]", "number[]"],
+		"options": {
+			"Variant": ["Fuel", "None"]
+		}
 	}
 }
 

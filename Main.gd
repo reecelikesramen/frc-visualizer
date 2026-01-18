@@ -34,6 +34,17 @@ func _ready():
 	# Handle clean exit request for auto-save
 	get_tree().auto_accept_quit = false
 
+	# --- Add Timeline ---
+	var right_side = $HSplitContainer/RightSide
+	var TimelineScript = preload("res://Timeline.gd")
+	var timeline = TimelineScript.new()
+	timeline.name = "Timeline"
+	timeline.custom_minimum_size.y = 60 # Initial height
+	timeline.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_side.add_child(timeline)
+	# Move to index 1 (Below TabBar, Above VSplitContainer)
+	right_side.move_child(timeline, 1)
+
 func _on_tab_changed(tab_idx: int):
 	# Save current topics to cache before switching
 	monitored_topics_cache[current_tab_idx] = topic_dock.get_topics()
