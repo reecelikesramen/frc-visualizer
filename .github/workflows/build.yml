@@ -15,6 +15,7 @@ jobs:
   build-rust-library:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
@@ -40,6 +41,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
