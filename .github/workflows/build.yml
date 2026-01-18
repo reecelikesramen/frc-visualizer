@@ -94,7 +94,7 @@ jobs:
         working-directory: nt4_logging
         run: |
           if [[ "${{ matrix.target }}" == *"apple"* ]]; then
-            export RUSTFLAGS="-C link-arg=-isysroot -C link-arg=$GITHUB_WORKSPACE/MacOSX12.3.sdk"
+            export SDKROOT=$(pwd)/../MacOSX12.3.sdk
           fi
           cargo zigbuild --release --target ${{ matrix.target }}
 
