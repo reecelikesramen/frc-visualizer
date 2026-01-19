@@ -8,6 +8,7 @@ var topic_row_scene = preload("res://TopicRow.tscn")
 var nt_instance_ref = null
 
 var active_visualizers = {} # path -> { "node": Node, "type": String }
+var viz_settings_cache = {} # path -> options dictionary
 
 var current_mode = "3D"
 
@@ -73,9 +74,14 @@ func add_topic(path: String, type: String, nt_ref: Node):
 	container.add_child(row)
 	row.setup(path, type, nt_ref)
 	row.visualization_requested.connect(_on_visualization_requested)
+	row.options_changed.connect(_on_options_changed)
 	# Connect tree_exiting with binding to handle removal
 	row.tree_exiting.connect(_on_row_exiting.bind(row))
 	row.tree_exiting.connect(_notify_change) # Listen for removal/change
+	
+	# Prime with cached settings if available
+	if viz_settings_cache.has(path):
+		row.restore_viz_state("", viz_settings_cache[path])
 	
 	# If we have existing children in the list data? 
 	# The flatten/restore logic needs to handle this.
@@ -102,7 +108,7 @@ func _on_visualization_requested(path: String, type: String, viz_type: String):
 	_notify_change()
 	_update_field_background_state()
 
-func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
+func add_visualizer(path: String, viz_type: String, nt_type: String = "", options: Dictionary = {}):
 	if not nt_instance_ref:
 		push_warning("TopicDock: Cannot add visualizer, NT instance not set")
 		return
@@ -128,8 +134,18 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 		"topic_type": nt_type,
 		"parent_viz_type": "root",
 		"parent_node": null,
-		"mode": current_mode
+		"mode": current_mode,
+		"options": options # Pass options to setup
 	}
+	
+	# Fallback to cache if options are empty
+	if options.is_empty() and viz_settings_cache.has(path):
+		options = viz_settings_cache[path]
+		context["options"] = options
+		# Also ensure TopicRow knows about this if it triggered the add?
+		# (TopicRow triggered add via signal, it might be out of sync if cache was newer? 
+		# No, TopicRow holds truth usually except for restore/cache logic)
+		pass
 
 	# Check for hierarchy nesting in the Dock
 	var row_node = _find_row_by_path(path, container)
@@ -175,19 +191,26 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 	var viz_node = null
 	
 	match viz_type:
-		"Robot":
+		"Robot", "Ghost":
 			if current_mode == "2D":
 				viz_node = Node2D.new()
 				viz_node.set_script(load("res://visualizers/RobotVisualizer2D.gd"))
 			else:
 				viz_node = Node3D.new()
 				viz_node.set_script(load("res://visualizers/RobotVisualizer.gd"))
-				# Default debug mesh
-				var mesh_inst = MeshInstance3D.new()
-				mesh_inst.mesh = BoxMesh.new()
-				mesh_inst.mesh.size = Vector3(0.5, 0.5, 0.5)
-				viz_node.add_child(mesh_inst)
+				# Apply options immediately if possible, or setup() will do it
+				# Default debug mesh handled by script now
 			
+		"Component":
+			if current_mode == "2D":
+				# Not implemented yet for 2D, fallback?
+				viz_node = Node2D.new()
+				# Reuse RobotVisualizer2D or create specific?
+				viz_node.set_script(load("res://visualizers/RobotVisualizer2D.gd"))
+			else:
+				viz_node = Node3D.new()
+				viz_node.set_script(load("res://visualizers/ComponentVisualizer.gd"))
+
 		"Game Piece":
 			if current_mode == "2D":
 				viz_node = Node2D.new()
@@ -223,9 +246,31 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = ""):
 		parent.add_child(viz_node)
 		if viz_node.has_method("setup"):
 			viz_node.setup(nt_instance_ref, path, context)
+		
+		# Apply Options
+		_apply_options(viz_node, options)
 			
 		active_visualizers[path] = {"node": viz_node, "type": viz_type}
 
+
+func _apply_options(node: Node, options: Dictionary):
+	if options.has("Model") and node.has_method("set_custom_model"):
+		node.set_custom_model(options["Model"])
+	if options.has("Offset") and node.has_method("set_model_offset"):
+		node.set_model_offset(options["Offset"])
+	if options.has("Rotation") and node.has_method("set_model_rotation"):
+		node.set_model_rotation(options["Rotation"])
+	# Add other option handlers here (Color, etc)
+
+func _on_options_changed(path: String, options: Dictionary):
+	# Update Cache
+	viz_settings_cache[path] = options.duplicate()
+	
+	if active_visualizers.has(path):
+		var node = active_visualizers[path]["node"]
+		if is_instance_valid(node):
+			_apply_options(node, options)
+			_notify_change() # Save state
 
 func remove_visualizer(path: String):
 	if active_visualizers.has(path):
@@ -289,6 +334,10 @@ func _gather_topics_recursive(parent_container, list: Array):
 				"type": child.topic_type,
 				"children": []
 			}
+			# Save Options
+			if "viz_options" in child:
+				data["viz_options"] = child.viz_options
+				
 			if active_visualizers.has(child.topic_path):
 				data["viz"] = active_visualizers[child.topic_path]["type"]
 			
@@ -319,6 +368,7 @@ func _restore_topics_recursive(list: Array, parent_node: Node, nt_node: Node):
 		parent_node.add_child(row)
 		row.setup(item["path"], item["type"], nt_node)
 		row.visualization_requested.connect(_on_visualization_requested)
+		row.options_changed.connect(_on_options_changed) # Connect Options Signal
 		row.tree_exiting.connect(_on_row_exiting.bind(row))
 		row.tree_exiting.connect(_notify_change)
 		
@@ -330,8 +380,11 @@ func _restore_topics_recursive(list: Array, parent_node: Node, nt_node: Node):
 			if margin:
 				row.parent_row = margin.get_parent() # TopicRow
 		
+		var options = item.get("viz_options", {})
 		if item.has("viz"):
-			add_visualizer(item["path"], item["viz"], item["type"])
+			# Restore UI state for options
+			row.restore_viz_state(item["viz"], options)
+			add_visualizer(item["path"], item["viz"], item["type"], options)
 			
 		if item.has("children"):
 			_restore_topics_recursive(item["children"], row.get_node("MarginContainer/ChildrenContainer"), nt_node)

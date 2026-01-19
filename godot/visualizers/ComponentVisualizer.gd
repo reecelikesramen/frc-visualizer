@@ -12,53 +12,45 @@ const SMOOTH_SPEED = 30.0
 # 3D Model Management
 var model_node: Node3D = null
 var model_offset: Vector3 = Vector3.ZERO
-var model_rotation: Vector3 = Vector3.ZERO # Degrees
+var model_rotation: Vector3 = Vector3.ZERO
 var current_model_path: String = ""
 
 func setup(nt: Node, path: String, context: Dictionary = {}):
 	nt_instance = nt
 	topic_path = path
 	
-	# Initial Model Setup
-	# Logic to check context for pre-existing model selection would happen here if passed
-	
-	# Default placeholder if nothing loaded yet
 	_ensure_default_model()
 
 func _ready():
-	# Initialize target to current spot
 	target_pose = global_transform
 
 func _process(delta: float) -> void:
 	if not nt_instance or topic_path == "":
 		return
 
-	# 1. Get the latest data from NT
 	valid_nt_update()
-	
-	# 3. Smoothly Interpolate
 	transform = transform.interpolate_with(target_pose, SMOOTH_SPEED * delta)
 
 func valid_nt_update():
-	# Check for Pose2d vs Pose3d based on data size
+	# Components might be Transform3d or Pose3d
+	# Prioritize Transform3d for components usually? Or just use same logic.
+	# The registry allows Pose3d, Transform3d.
+	# NT4 lib usually distinguishes.
+	# Try Pose3d first (most common for "Robot"-like things)
+	# Or just generic get_pose3d which falls back?
+	# Let's try to detect type if possible, or just ask implementation.
+	# Just reuse the robust logic from RobotVisualizer for now given the types are same intersection
 	var val = nt_instance.get_value(topic_path, null)
 	
 	if val is PackedByteArray and val.size() == 24:
-		# Pose2d (24 bytes) -> Convert to 3D
-		# get_pose2d returns Godot 2D: x=FRC_X, y=-FRC_Y, rot=-FRC_Theta
+		# Pose2d/Transform2d
 		var p2d = nt_instance.get_pose2d(topic_path, Transform2D())
-		
-		# Map to Godot 3D:
-		# X = -FRC_Y = p2d.origin.y
-		# Z = -FRC_X = -p2d.origin.x
-		# Yaw = FRC_Theta = -p2d.rotation
 		var x = p2d.origin.y
 		var z = - p2d.origin.x
 		var yaw = - p2d.get_rotation()
-		
 		target_pose = Transform3D(Basis(Vector3.UP, yaw), Vector3(x, 0.0, z))
 	else:
-		# Default to Pose3d
+		# Pose3d/Transform3d
 		target_pose = nt_instance.get_pose3d(topic_path, target_pose)
 
 # --- Model Management API ---
@@ -74,49 +66,24 @@ func set_model_rotation(degrees: Vector3):
 		model_node.rotation_degrees = model_rotation
 
 func _convert_frc_offset(vec: Vector3) -> Vector3:
-	# Input: FRC Space (X=Fwd, Y=Left, Z=Up)
-	# Output: Godot Space (X=Right, Y=Up, Z=Back)
-	# FRC X (Fwd) -> Godot -Z
-	# FRC Y (Left) -> Godot -X
-	# FRC Z (Up)  -> Godot Y
 	return Vector3(-vec.y, vec.z, -vec.x)
 
 func _convert_frc_rotation(euler_deg: Vector3) -> Vector3:
-	# Input: FRC Euler Angles (Roll, Pitch, Yaw) in Degrees
-	# FRC Roll (Around X axis)
-	# FRC Pitch (Around Y axis)
-	# FRC Yaw (Around Z axis)
 	var r = deg_to_rad(euler_deg.x)
 	var p = deg_to_rad(euler_deg.y)
 	var y = deg_to_rad(euler_deg.z)
 	
 	var b = Basis()
-	
-	# Apply rotations in intrinsic or sequence order.
-	# Standard aerospace sequence: Yaw -> Pitch -> Roll (Intrinsic usually, or extrinsic ZYX)
-	# Let's apply them sequentially as global rotations for simplicity of mental model if extrinsic.
-	# Or just construct the rotation.
-	
-	# Rotate around FRC Z (Up) -> Godot Y
-	b = b.rotated(Vector3(0, 1, 0), y)
-	
-	# Rotate around FRC Y (Left) -> Godot -X
-	b = b.rotated(Vector3(-1, 0, 0), p)
-	
-	# Rotate around FRC X (Fwd) -> Godot -Z
-	b = b.rotated(Vector3(0, 0, -1), r)
+	b = b.rotated(Vector3(0, 1, 0), y) # Z_frc -> Y_godot
+	b = b.rotated(Vector3(-1, 0, 0), p) # Y_frc -> -X_godot
+	b = b.rotated(Vector3(0, 0, -1), r) # X_frc -> -Z_godot
 	
 	return b.get_euler() * (180.0 / PI)
 
 func set_custom_model(path: String):
-	# Force reload if it's the same path? User might have updated file.
-	# But checking path == current is efficient. 
-	# Let's trust user to rename or we can remove check if needed.
-	# User reported "doesn't load" -> Maybe check needs to be looser or `TopicDock` logic fixed.
-	if path == current_model_path:
+	if path == current_model_path and path != "":
 		return
 		
-	# Load new model
 	var gltf = GLTFDocument.new()
 	var state = GLTFState.new()
 	var err = gltf.append_from_file(path, state)
@@ -126,8 +93,6 @@ func set_custom_model(path: String):
 		_replace_model_node(scene)
 		current_model_path = path
 	else:
-		# Try .obj via load() if it's in res:// or user://? 
-		# Validating if simple ResourceLoader works for user:// paths for OBJ/Scenes
 		if ResourceLoader.exists(path):
 			var res = load(path)
 			if res is PackedScene:
@@ -139,7 +104,7 @@ func set_custom_model(path: String):
 				_replace_model_node(mi)
 				current_model_path = path
 		else:
-			push_warning("RobotVisualizer: Failed to load model from " + path)
+			push_warning("ComponentVisualizer: Failed to load model from " + path)
 
 func _replace_model_node(new_node: Node3D):
 	if model_node:
@@ -151,10 +116,14 @@ func _replace_model_node(new_node: Node3D):
 	model_node.position = model_offset
 	model_node.rotation_degrees = model_rotation
 	model_node.visible = true
+	
+	# Force visibility update if parent or tree state was lagging
+	if is_inside_tree():
+		model_node.force_update_transform()
 
 func _ensure_default_model():
 	if not model_node:
 		var mesh_inst = MeshInstance3D.new()
 		mesh_inst.mesh = BoxMesh.new()
-		mesh_inst.mesh.size = Vector3(0.5, 0.5, 0.5)
+		mesh_inst.mesh.size = Vector3(0.3, 0.3, 0.3) # Slightly smaller default for components
 		_replace_model_node(mesh_inst)

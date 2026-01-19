@@ -40,19 +40,27 @@ const RULES_3D = {
 	"Robot": {
 		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "number[]"],
 		"options": {
-			"Model": ["2026 KitBot", "2025 KitBot", "2025", "2024 KitBot", "Crab Bot", "Duck Bot", "KitBot"]
+			"Model": ["2026 KitBot", "2025 KitBot", "2025", "2024 KitBot", "Crab Bot", "Duck Bot", "KitBot", "Custom"],
+			"Offset": "Vector3",
+			"Rotation": "Vector3"
 		}
 	},
 	"Ghost": {
 		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "number[]"],
 		"options": {
-			"Model": ["2026 KitBot", "2025 KitBot", "2025", "2024 KitBot", "Crab Bot", "Duck Bot", "KitBot"],
-			"Color": ["Green", "Red", "Blue", "Orange", "Cyan", "Yellow", "Magenta"]
+			"Model": ["2026 KitBot", "2025 KitBot", "2025", "2024 KitBot", "Crab Bot", "Duck Bot", "KitBot", "Custom"],
+			"Color": ["Green", "Red", "Blue", "Orange", "Cyan", "Yellow", "Magenta"],
+			"Offset": "Vector3",
+			"Rotation": "Vector3"
 		}
 	},
 	"Component": {
 		"sources": ["Pose3d", "Pose3d[]", "Transform3d", "Transform3d[]", "number[]"],
-		"options": {},
+		"options": {
+			"Model": ["Custom"],
+			"Offset": "Vector3",
+			"Rotation": "Vector3"
+		},
 		"context": ["Robot", "Ghost"]
 	},
 	"Mechanism": {

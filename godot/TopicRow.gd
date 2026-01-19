@@ -10,12 +10,17 @@ var nt_instance = null
 @onready var path_label: Label = $TopBar/PathLabel
 @onready var close_button: Button = $TopBar/CloseButton
 @onready var children_container: VBoxContainer = $MarginContainer/ChildrenContainer
-@onready var highlight_rect = $HighlightRect # Added via code/edit separately or expected
+@onready var highlight_rect = $HighlightRect
 
-# Hierarchy
-var parent_row = null # If nested
-var row_data = {} # {path, type, etc} for drag data
+	# Create Options Container dynamically
+	# Removed: UI moved to Context Menu
+var parent_row = null
+var row_data = {}
 var is_drag_highlighted = false
+
+# Visualizer State
+var current_viz_type = ""
+var viz_options = {} # { "Model": "path", "Offset": Vector3 }
 
 func setup(path: String, type: String, nt: Node):
 	topic_path = path
@@ -32,7 +37,6 @@ func setup(path: String, type: String, nt: Node):
 	if path_label:
 		path_label.text = path
 	
-	# Set tooltip
 	tooltip_text = path
 	
 	row_data = {
@@ -42,6 +46,8 @@ func setup(path: String, type: String, nt: Node):
 		"nt_ref": nt_instance
 	}
 
+	# Options UI moved to Context Menu
+
 # --- Drag & Drop ---
 
 func _get_drag_data(at_position):
@@ -49,38 +55,28 @@ func _get_drag_data(at_position):
 	preview.text = topic_path
 	set_drag_preview(preview)
 	
-	# If we are dragging, we might be dragging THIS whole tree.
-	# Return self reference or data struct? Data struct is safer for cross-dock.
-	# But we need to move the node.
 	row_data["source_node"] = self
+	row_data["viz_options"] = viz_options # Include options in drag data
 	return row_data
 
 func _can_drop_data(at_position, data):
 	if typeof(data) == TYPE_DICTIONARY and data.get("type") == "nt_topic":
 		var source_node = data.get("source_node")
-		if source_node == self: return false # Can't drop on self
+		if source_node == self: return false
 		
-		# STRICT VALIDATION based on User Request
-		# "Add to existing 'Robot' or 'Ghost' item"
-		# Check if THIS row (parent) has an active visualizer
+		# STRICT VALIDATION: Parent must be visualized to accept children
 		var dock = get_dock()
 		if dock and dock.active_visualizers.has(topic_path):
 			var parent_viz_info = dock.active_visualizers[topic_path]
 			var parent_viz_type = parent_viz_info["type"]
 			var current_mode = dock.current_mode if "current_mode" in dock else "3D"
-			
 			var child_nt_type = data.get("nt_type", "")
 			
-			# Check if there are any compatible modifiers for this child type given the parent
 			var modifiers = VisualizerRegistry.get_compatible_modifiers(child_nt_type, parent_viz_type, current_mode)
 			if modifiers.is_empty():
-				# No compatible modifiers? REJECT.
 				return false
 		else:
-			# Parent has NO visualizer.
-			# User strict rule: "Prevent top-level visualizers from being nested under any other visualizer."
-			# And "Add to existing 'Robot' or 'Ghost' item" implies parent MUST be visualized.
-			return false
+			return false # No viz on parent -> no children
 
 		_set_drag_highlight(true)
 		return true
@@ -100,7 +96,6 @@ func _drop_data(at_position, data):
 			source_node.get_parent().remove_child(source_node)
 		children_container.add_child(source_node)
 		source_node.parent_row = self
-		# Notify dock of structure change
 		get_tree().call_group("dock_updates", "_notify_change")
 		return
 
@@ -110,23 +105,15 @@ func _drop_data(at_position, data):
 	var nt_ref = data.get("nt_ref")
 	
 	if path and type:
-		# Check duplicates in immediate children?
 		for child in children_container.get_children():
 			if "topic_path" in child and child.topic_path == path:
-				return # Already exists
+				return
 		
-		# Instantiate new row
-		# We need to load the scene. self.filename? Or preload from script?
-		# TopicDock has the scene preloaded. We can ask Dock?
-		# Or just load("res://TopicRow.tscn")
 		var new_row = load("res://TopicRow.tscn").instantiate()
 		children_container.add_child(new_row)
 		new_row.setup(path, type, nt_ref)
 		new_row.parent_row = self
 		
-		# Connect signals logic is tricky because `TopicDock` usually connects them.
-		# `TopicRow` doesn't have `_on_visualization_requested`.
-		# We need to connect the new row's signals to `TopicDock`!
 		var dock = get_dock()
 		if dock:
 			new_row.visualization_requested.connect(dock._on_visualization_requested)
@@ -143,54 +130,27 @@ func _notification(what):
 
 func _process(_delta):
 	if nt_instance and topic_path != "":
-		# Check liveness
-		# We can check if get_topic_info contains our path, or simply check the value
-		# NT4 doesn't have a cheap "exists" on client side easily without checking topic info list linearly
-		# But we can try to get value. If it returns default for a long time...?
-		# Better: Check if the value returned is "non-empty/non-default" or if we use get_topic_info check occasionally.
-		# For efficiency, let's just assume if get_value returns default it might be missing, 
-		# OR we can assume if it's not in the tree it doesn't exist.
-		# Let's check `nt_instance.get_topic_info`? No that's expensive every frame.
-		# NT4 lib usually returns 0/default if missing.
-		# Let's just modify visual based on value.
-		# Basic liveness check: If we have a standard default value and it never changes, it might be missing.
-		# But better, if the tree refreshes, we know what topics exist.
-		# But `TopicRow` doesn't have access to the Tree.
-		# Let's rely on simple rule: If `nt_instance` is valid, we assume it's connected.
-		# If we want "missing topic" (e.g. robot offline or code changed), 
-		# we'd need to poll `nt.get_topic_info()` occasionally. 
-		# Let's do a loose check: if value is empty/default, dim it.
-		# Actually, user requirement: "add an X symbol and a muted text or strikethrough"
-		# To strictly know if it "no longer exists", we need to know the list of ALL topics.
-		# Let's have TopicDock pass the "known_topics" set to rows? 
-		# Or have TopicRow poll `nt_instance` occasionally?
-		# Let's skip complex polling for now and just set text. 
-		# If we really want to support 'missing' properly we need the list of topics.
 		var val = _fetch_value()
 		value_label.text = val
 		
-		# Basic check
 		if val == "...":
 			_set_params(true)
 		else:
 			_set_params(false)
 
 func _fetch_value() -> String:
-	# Check for Structs
 	if topic_type.begins_with("struct:"):
 		var raw = nt_instance.get_value(topic_path, PackedByteArray())
 		if typeof(raw) == TYPE_PACKED_BYTE_ARRAY:
 			if raw.size() > 0:
-				_set_params(false) # Exists
+				_set_params(false)
 				var parsed = StructParser.parse_packet(raw, topic_type)
-				return StructParser.format_value(parsed, false) # Long format
+				return StructParser.format_value(parsed, false)
 			else:
-				_set_params(true) # Empty/Default -> Missing?
+				_set_params(true)
 				return "..."
 		return "struct..."
 		
-	# For primitives, hard to distinguish 0.0 from missing.
-	# But we can assume if we are getting updates it works.
 	if topic_type == "double" or topic_type == "float":
 		return "%.2f" % nt_instance.get_number(topic_path, 0.0)
 	elif topic_type == "int":
@@ -206,22 +166,15 @@ func _fetch_value() -> String:
 	elif topic_type == "boolean[]":
 		var default_arr: Array[bool] = []
 		return StructParser.format_value(nt_instance.get_boolean_array(topic_path, default_arr), false)
-	# Add other types as needed
 	return "..."
 
 func _set_params(missing: bool):
 	if missing:
 		modulate.a = 0.5
-		# We could add strikethrough if we had a font override, but alpha is good for now.
-		# Adding 'X' symbol:
-		if not value_label.text.begins_with("[X]"):
-			# value_label.text = "[X] " + value_label.text
-			pass
 	else:
 		modulate.a = 1.0
 
 func _ready():
-	# Setup icon input
 	icon_rect.mouse_filter = Control.MOUSE_FILTER_STOP
 	icon_rect.gui_input.connect(_on_icon_gui_input)
 
@@ -230,8 +183,6 @@ func _on_icon_gui_input(event):
 		_show_context_menu()
 
 func get_dock():
-	# Traverse up to find TopicDock
-	# Row -> VBox -> ScrollContainer -> TopicDock
 	var p = get_parent()
 	while p:
 		if p.name == "TopicDock" or p.get_script() == load("res://TopicDock.gd"):
@@ -242,24 +193,25 @@ func get_dock():
 func _show_context_menu():
 	var popup = PopupMenu.new()
 	
-	# Determine current active visualizer
 	var dock = get_dock()
 	var current_mode = dock.current_mode if dock and "current_mode" in dock else "3D"
 	var current_viz = ""
 	
 	if dock and dock.active_visualizers.has(topic_path):
 		current_viz = dock.active_visualizers[topic_path]["type"]
+		# Update internal state if drift occurred
+		if current_viz != current_viz_type:
+			restore_viz_state(current_viz, viz_options)
 	
-	# Default Item
+	current_viz_type = current_viz # Sync
+	
 	var default_checked = (current_viz == "")
 	popup.add_radio_check_item("Visualize as Text (Default)", 0)
 	popup.set_item_checked(popup.get_item_index(0), default_checked)
 	
-	# Dictionary to map IDs to specific visualizer names strings
 	var id_map = {}
 	var current_id = 100
 	
-	# Check Parent Visualization Status
 	var has_visualized_parent = false
 	var parent_viz_type = ""
 	
@@ -271,7 +223,6 @@ func _show_context_menu():
 	# 1. Top Level Visualizers
 	if not has_visualized_parent:
 		var compatible_viz = VisualizerRegistry.get_compatible_visualizers(topic_type, current_mode)
-		
 		if compatible_viz.size() > 0:
 			popup.add_separator("Visualizers")
 			for viz in compatible_viz:
@@ -280,10 +231,9 @@ func _show_context_menu():
 				id_map[current_id] = viz
 				current_id += 1
 			
-	# 2. Modifiers (Context-based)
+	# 2. Modifiers
 	if has_visualized_parent:
 		var modifiers = VisualizerRegistry.get_compatible_modifiers(topic_type, parent_viz_type, current_mode)
-		
 		if modifiers.size() > 0:
 			popup.add_separator("Add to Parent")
 			for mod in modifiers:
@@ -292,10 +242,19 @@ func _show_context_menu():
 				id_map[current_id] = mod
 				current_id += 1
 	
-	# Set metadata for each item!
 	for id in id_map:
 		var idx = popup.get_item_index(id)
 		popup.set_item_metadata(idx, id_map[id])
+
+	# 3. Model Configuration (if applicable)
+	if current_viz != "" and current_viz != "none":
+		var rules = VisualizerRegistry.get_rules(current_mode)
+		var options_def = rules.get(current_viz, {}).get("options", {})
+		
+		# Check if it supports custom model
+		if options_def.has("Model") and options_def["Model"].has("Custom"):
+			popup.add_separator()
+			popup.add_item("Configure Model...", 200)
 
 	popup.id_pressed.connect(_on_context_menu_item_selected.bind(popup))
 	add_child(popup)
@@ -303,20 +262,24 @@ func _show_context_menu():
 	popup.show()
 
 func _on_context_menu_item_selected(id, popup: PopupMenu):
+	if id == 200:
+		_open_model_config()
+		return
+		
 	var index = popup.get_item_index(id)
 	var viz_name = popup.get_item_metadata(index)
 	
 	if id == 0:
-		# Text / Default
 		visualization_requested.emit(topic_path, topic_type, "none")
+		current_viz_type = ""
 		return
 
 	if viz_name:
 		visualization_requested.emit(topic_path, topic_type, viz_name)
+		current_viz_type = viz_name
 	else:
 		print("Unknown visualizer ID selected: ", id)
 
-	
 func _on_close_button_pressed():
 	queue_free()
 
@@ -329,3 +292,83 @@ func _set_drag_highlight(enabled: bool):
 		modulate = Color(1.2, 1.2, 1.2) if enabled else Color(1, 1, 1)
 
 signal visualization_requested(path: String, type: String, viz_type: String)
+signal options_changed(path: String, options: Dictionary) # To notify dock to update live visualizer
+
+# --- Options UI Logic ---
+
+# --- Options UI Logic ---
+
+func restore_viz_state(viz_type: String, options: Dictionary):
+	current_viz_type = viz_type
+	viz_options = options.duplicate()
+	# No UI updates needed, handled via context menu now
+
+func _open_model_config():
+	# Instantiate dialog
+	var dialog_script = load("res://ModelConfigDialog.gd")
+	if not dialog_script:
+		print("ModelConfigDialog.gd not found")
+		return
+		
+	var dialog = dialog_script.new()
+	add_child(dialog)
+	dialog.setup(viz_options)
+	dialog.settings_changed.connect(_on_dialog_settings_changed)
+	dialog.popup_centered()
+	# Dialog will auto-hide on close/confirm, and we let it stay alive or free it?
+	# AcceptDialogs queue_free on close usually if configured? No.
+	dialog.visibility_changed.connect(func(): if not dialog.visible: dialog.queue_free())
+
+func _on_dialog_settings_changed(new_options: Dictionary):
+	# Merge changes
+	var old_model = viz_options.get("Model", "")
+	var new_model = new_options.get("Model", "")
+	
+	# Handle File Persistence if model changed
+	if new_model != "" and new_model != old_model:
+		# Copy logic with hashing
+		if not new_model.begins_with("res://") and not new_model.begins_with("user://"):
+			new_model = _import_model_file(new_model)
+			
+	viz_options["Model"] = new_model
+	viz_options["Offset"] = new_options.get("Offset", Vector3.ZERO)
+	viz_options["Rotation"] = new_options.get("Rotation", Vector3.ZERO)
+	
+	_notify_options_changed()
+
+func _import_model_file(path: String) -> String:
+	var f = FileAccess.open(path, FileAccess.READ)
+	if not f:
+		print("Failed to open model file: ", path)
+		return path
+		
+	var content_hash = f.get_md5(path) # Godot built-in MD5 check
+	var ext = path.get_extension()
+	var filename = content_hash + "." + ext
+	
+	var dest_dir = "user://models"
+	var dir = DirAccess.open("user://")
+	if not dir.dir_exists("models"):
+		dir.make_dir("models")
+		
+	var dest_path = dest_dir + "/" + filename
+	
+	# If exists, we assume it's the same file (hash collision unlikely or acceptable)
+	if FileAccess.file_exists(dest_path):
+		return dest_path
+		
+	# Copy
+	var dir_abs = DirAccess.open(path.get_base_dir())
+	if dir_abs:
+		var err = dir_abs.copy(path, dest_path)
+		if err == OK:
+			return dest_path
+	
+	print("Failed to copy model.")
+	return path
+
+func _notify_options_changed():
+	options_changed.emit(topic_path, viz_options)
+	# Also update drag data
+	row_data["viz_options"] = viz_options
+	get_tree().call_group("dock_updates", "_notify_change") # Trigger Save
