@@ -191,7 +191,7 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = "", option
 	var viz_node = null
 	
 	match viz_type:
-		"Robot", "Ghost":
+		"Robot":
 			if current_mode == "2D":
 				viz_node = Node2D.new()
 				viz_node.set_script(load("res://visualizers/RobotVisualizer2D.gd"))
@@ -200,6 +200,15 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = "", option
 				viz_node.set_script(load("res://visualizers/RobotVisualizer.gd"))
 				# Apply options immediately if possible, or setup() will do it
 				# Default debug mesh handled by script now
+		
+		"Ghost":
+			if current_mode == "2D":
+				viz_node = Node2D.new()
+				# Fallback to standard 2D robot for now, or implement Ghost2D later
+				viz_node.set_script(load("res://visualizers/RobotVisualizer2D.gd"))
+			else:
+				viz_node = Node3D.new()
+				viz_node.set_script(load("res://visualizers/GhostRobotVisualizer.gd"))
 			
 		"Component":
 			if current_mode == "2D":
@@ -254,13 +263,45 @@ func add_visualizer(path: String, viz_type: String, nt_type: String = "", option
 
 
 func _apply_options(node: Node, options: Dictionary):
-	if options.has("Model") and node.has_method("set_custom_model"):
-		node.set_custom_model(options["Model"])
-	if options.has("Offset") and node.has_method("set_model_offset"):
+	var model_value = options.get("Model", "")
+	
+	if model_value != "" and node.has_method("set_custom_model"):
+		# Check if it's a custom robot name from RobotModelLibrary
+		var custom_robot = RobotModelLibrary.get_custom_robot(model_value)
+		if not custom_robot.is_empty():
+			# It's a custom robot - apply its chassis model
+			var chassis_model = custom_robot.get("chassis_model", "")
+			if chassis_model != "":
+				node.set_custom_model(chassis_model)
+			# Override offset/rotation from the robot config
+			if node.has_method("set_model_offset"):
+				node.set_model_offset(RobotModelLibrary.parse_vector3(custom_robot.get("chassis_offset", [0, 0, 0])))
+			if node.has_method("set_model_rotation"):
+				node.set_model_rotation(RobotModelLibrary.parse_vector3(custom_robot.get("chassis_rotation", [0, 0, 0])))
+		else:
+			# It's a pre-installed model name or a file path
+			# Pre-installed models need path resolution (handled by visualizer or we skip)
+			# File paths (user://, res://) are passed directly
+			if model_value.begins_with("user://") or model_value.begins_with("res://") or model_value.begins_with("/"):
+				node.set_custom_model(model_value)
+			else:
+				# Pre-installed models mapping: Try to find file in res://models/robots/
+				var safe_name = model_value.replace(" ", "_")
+				var path_glb = "res://models/robots/" + safe_name + ".glb"
+				var path_gltf = "res://models/robots/" + safe_name + ".gltf"
+				
+				if ResourceLoader.exists(path_glb):
+					node.set_custom_model(path_glb)
+				elif ResourceLoader.exists(path_gltf):
+					node.set_custom_model(path_gltf)
+	
+	# Apply explicit offsets if provided (overrides custom robot defaults)
+	if options.has("Offset") and options["Offset"] is Vector3 and node.has_method("set_model_offset"):
 		node.set_model_offset(options["Offset"])
-	if options.has("Rotation") and node.has_method("set_model_rotation"):
+	if options.has("Rotation") and options["Rotation"] is Vector3 and node.has_method("set_model_rotation"):
 		node.set_model_rotation(options["Rotation"])
-	# Add other option handlers here (Color, etc)
+	if options.has("Color") and node.has_method("set_color"):
+		node.set_color(options["Color"])
 
 func _on_options_changed(path: String, options: Dictionary):
 	# Update Cache

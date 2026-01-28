@@ -141,37 +141,37 @@ jobs:
           lfs: true
 
       - name: Create bin directory
-        run: mkdir -p godot/bin
+        run: mkdir -p godot/bin/windows/x86_64 godot/bin/windows/arm64 godot/bin/linux/x86_64 godot/bin/linux/arm64 godot/bin/macos/arm64
 
       - name: Download Linux x64
         uses: actions/download-artifact@v4
         with:
           name: rust-lib-linux-x86_64
-          path: godot/bin
+          path: godot/bin/linux/x86_64
 
       - name: Download Linux arm64
         uses: actions/download-artifact@v4
         with:
           name: rust-lib-linux-arm64
-          path: godot/bin
+          path: godot/bin/linux/arm64
 
       - name: Download Windows x64
         uses: actions/download-artifact@v4
         with:
           name: rust-lib-windows-x86_64
-          path: godot/bin
+          path: godot/bin/windows/x86_64
 
       - name: Download Windows arm64
         uses: actions/download-artifact@v4
         with:
           name: rust-lib-windows-arm64
-          path: godot/bin
+          path: godot/bin/windows/arm64
 
       - name: Download MacOS arm64
         uses: actions/download-artifact@v4
         with:
           name: rust-lib-macos-arm64
-          path: godot/bin
+          path: godot/bin/macos/arm64
 
       - name: Setup Export Templates
         run: |
@@ -183,32 +183,80 @@ jobs:
           mkdir -p build/windows_x86_64
           godot --headless --verbose --path godot --export-release "Windows x86_64" ../build/windows_x86_64/FRC_Visualization.exe
           godot --headless --verbose --path godot --export-debug "Windows x86_64" ../build/windows_x86_64/FRC_Visualization_debug.exe
-          zip -j build/FRC_Visualization_Windows_x86_64.zip build/windows_x86_64/FRC_Visualization.exe godot/bin/nt4_logging.dll
-          zip -j build/FRC_Visualization_Windows_x86_64_debug.zip build/windows_x86_64/FRC_Visualization_debug.exe godot/bin/nt4_logging.dll
+          # Zip the exe and the ENTIRE godot/bin directory structure so the gdextension relative paths work
+          cd build/windows_x86_64
+          zip -r ../FRC_Visualization_Windows_x86_64.zip .
+          cd ../..
+          cd godot
+          zip -r ../build/FRC_Visualization_Windows_x86_64.zip bin/windows/x86_64/nt4_logging.dll
+          cd .. 
+          
+          cd build/windows_x86_64
+          zip -r ../FRC_Visualization_Windows_x86_64_debug.zip FRC_Visualization_debug.exe
+          cd ../..
+          cd godot
+          zip -r ../build/FRC_Visualization_Windows_x86_64_debug.zip bin/windows/x86_64/nt4_logging.dll
+          cd ..
 
       - name: Build Windows arm64
         run: |
           mkdir -p build/windows_arm64
           godot --headless --verbose --path godot --export-release "Windows arm64" ../build/windows_arm64/FRC_Visualization.exe
           godot --headless --verbose --path godot --export-debug "Windows arm64" ../build/windows_arm64/FRC_Visualization_debug.exe
-          zip -j build/FRC_Visualization_Windows_arm64.zip build/windows_arm64/FRC_Visualization.exe godot/bin/nt4_logging.dll
-          zip -j build/FRC_Visualization_Windows_arm64_debug.zip build/windows_arm64/FRC_Visualization_debug.exe godot/bin/nt4_logging.dll
+          
+          cd build/windows_arm64
+          zip -r ../FRC_Visualization_Windows_arm64.zip .
+          cd ../..
+          cd godot
+          zip -r ../build/FRC_Visualization_Windows_arm64.zip bin/windows/arm64/nt4_logging.dll
+          cd ..
+          
+          cd build/windows_arm64
+          zip -r ../FRC_Visualization_Windows_arm64_debug.zip FRC_Visualization_debug.exe
+          cd ../..
+          cd godot
+          zip -r ../build/FRC_Visualization_Windows_arm64_debug.zip bin/windows/arm64/nt4_logging.dll
+          cd ..
 
       - name: Build Linux x86_64
         run: |
           mkdir -p build/linux_x86_64
           godot --headless --verbose --path godot --export-release "Linux x86_64" ../build/linux_x86_64/FRC_Visualization.x86_64
           godot --headless --verbose --path godot --export-debug "Linux x86_64" ../build/linux_x86_64/FRC_Visualization_debug.x86_64
-          zip -j build/FRC_Visualization_Linux_x86_64.zip build/linux_x86_64/FRC_Visualization.x86_64 godot/bin/libnt4_logging.so
-          zip -j build/FRC_Visualization_Linux_x86_64_debug.zip build/linux_x86_64/FRC_Visualization_debug.x86_64 godot/bin/libnt4_logging.so
+          
+          cd build/linux_x86_64
+          zip -r ../FRC_Visualization_Linux_x86_64.zip .
+          cd ../..
+          cd godot
+          zip -r ../build/FRC_Visualization_Linux_x86_64.zip bin/linux/x86_64/libnt4_logging.so
+          cd ..
+          
+          cd build/linux_x86_64
+          zip -r ../FRC_Visualization_Linux_x86_64_debug.zip FRC_Visualization_debug.x86_64
+          cd ../..
+          cd godot
+          zip -r ../build/FRC_Visualization_Linux_x86_64_debug.zip bin/linux/x86_64/libnt4_logging.so
+          cd ..
 
       - name: Build Linux arm64
         run: |
           mkdir -p build/linux_arm64
           godot --headless --verbose --path godot --export-release "Linux arm64" ../build/linux_arm64/FRC_Visualization.arm64
           godot --headless --verbose --path godot --export-debug "Linux arm64" ../build/linux_arm64/FRC_Visualization_debug.arm64
-          zip -j build/FRC_Visualization_Linux_arm64.zip build/linux_arm64/FRC_Visualization.arm64 godot/bin/libnt4_logging.so
-          zip -j build/FRC_Visualization_Linux_arm64_debug.zip build/linux_arm64/FRC_Visualization_debug.arm64 godot/bin/libnt4_logging.so
+          
+          cd build/linux_arm64
+          zip -r ../FRC_Visualization_Linux_arm64.zip .
+          cd ../..
+          cd godot
+          zip -r ../build/FRC_Visualization_Linux_arm64.zip bin/linux/arm64/libnt4_logging.so
+          cd ..
+          
+          cd build/linux_arm64
+          zip -r ../FRC_Visualization_Linux_arm64_debug.zip FRC_Visualization_debug.arm64
+          cd ../..
+          cd godot
+          zip -r ../build/FRC_Visualization_Linux_arm64_debug.zip bin/linux/arm64/libnt4_logging.so
+          cd ..
 
       - name: Build macOS
         run: |

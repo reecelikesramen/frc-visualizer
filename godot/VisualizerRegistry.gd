@@ -40,7 +40,7 @@ const RULES_3D = {
 	"Robot": {
 		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "number[]"],
 		"options": {
-			"Model": ["2026 KitBot", "2025 KitBot", "2025", "2024 KitBot", "Crab Bot", "Duck Bot", "KitBot", "Custom"],
+			"Model": ["2026 KitBot", "Duck Bot", "Crab Bot", "Custom"],
 			"Offset": "Vector3",
 			"Rotation": "Vector3"
 		}
@@ -48,7 +48,7 @@ const RULES_3D = {
 	"Ghost": {
 		"sources": ["Pose2d", "Pose3d", "Pose2d[]", "Pose3d[]", "Transform2d", "Transform3d", "Transform2d[]", "Transform3d[]", "number[]"],
 		"options": {
-			"Model": ["2026 KitBot", "2025 KitBot", "2025", "2024 KitBot", "Crab Bot", "Duck Bot", "KitBot", "Custom"],
+			"Model": ["2026 KitBot", "Duck Bot", "Crab Bot", "Custom"],
 			"Color": ["Green", "Red", "Blue", "Orange", "Cyan", "Yellow", "Magenta"],
 			"Offset": "Vector3",
 			"Rotation": "Vector3"
