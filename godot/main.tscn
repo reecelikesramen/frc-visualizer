@@ -35,12 +35,16 @@ transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, 
 transform = Transform3D(-0.99635875, 0.0034647742, -0.08518996, -0.018174686, 0.96757776, 0.25191867, 0.083300754, 0.25254968, -0.9639915, -2.0244346, 5.2732444, -12.241826)
 script = ExtResource("2_7mycd")
 
-[node name="HSplitContainer" type="HSplitContainer" parent="."]
+[node name="UIRoot" type="VBoxContainer" parent="."]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="HSplitContainer" type="HSplitContainer" parent="UIRoot"]
+layout_mode = 2
+size_flags_vertical = 3
 split_offset = 300
 
 [node name="NTTreeView" parent="HSplitContainer" instance=ExtResource("3_h2yge")]

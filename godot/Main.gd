@@ -1,15 +1,17 @@
 extends Node3D
 
-@onready var nt_tree_view = $HSplitContainer/NTTreeView
-@onready var topic_dock = $HSplitContainer/RightSide/VSplitContainer/TopicDock
-@onready var h_split = $HSplitContainer
-@onready var v_split = $HSplitContainer/RightSide/VSplitContainer
+@onready var ui_root = $UIRoot
+@onready var nt_tree_view = $UIRoot/HSplitContainer/NTTreeView
+@onready var topic_dock = $UIRoot/HSplitContainer/RightSide/VSplitContainer/TopicDock
+@onready var h_split = $UIRoot/HSplitContainer
+@onready var v_split = $UIRoot/HSplitContainer/RightSide/VSplitContainer
 @onready var camera = $Camera3D
-@onready var tab_bar = $HSplitContainer/RightSide/TabBar
-@onready var field_2d = $HSplitContainer/RightSide/VSplitContainer/ViewContainer/Field2D
+@onready var tab_bar = $UIRoot/HSplitContainer/RightSide/TabBar
+@onready var field_2d = $UIRoot/HSplitContainer/RightSide/VSplitContainer/ViewContainer/Field2D
 @onready var field_3d = $Field
 @onready var robot_parent = $RobotParent
-@onready var spacer_3d = $HSplitContainer/RightSide/VSplitContainer/ViewContainer/Spacer
+@onready var spacer_3d = $UIRoot/HSplitContainer/RightSide/VSplitContainer/ViewContainer/Spacer
+
 
 const SAVE_PATH = "user://ui_state.tres"
 var auto_save_timer = 0.0
@@ -44,7 +46,7 @@ func _ready():
 	get_tree().auto_accept_quit = false
 
 	# --- Add Timeline ---
-	var right_side = $HSplitContainer/RightSide
+	var right_side = $UIRoot/HSplitContainer/RightSide
 	var TimelineScript = preload("res://Timeline.gd")
 	var timeline = TimelineScript.new()
 	timeline.name = "Timeline"
@@ -177,7 +179,12 @@ func _setup_menus():
 	menu_bar = MenuBar.new()
 	menu_bar.name = "MenuBar"
 	menu_bar.prefer_global_menu = true
-	add_child(menu_bar)
+	
+	if DisplayServer.has_feature(DisplayServer.FEATURE_GLOBAL_MENU):
+		add_child(menu_bar)
+	else:
+		ui_root.add_child(menu_bar)
+		ui_root.move_child(menu_bar, 0)
 
 	file_menu = PopupMenu.new()
 	file_menu.name = "File"
