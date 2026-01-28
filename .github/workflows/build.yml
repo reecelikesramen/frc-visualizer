@@ -29,11 +29,11 @@ jobs:
             os: linux
             arch: arm64
             name: libnt4_logging.so
-          - target: x86_64-pc-windows-gnu
+          - target: x86_64-pc-windows-msvc
             os: windows
             arch: x86_64
             name: nt4_logging.dll
-          - target: aarch64-pc-windows-gnullvm
+          - target: aarch64-pc-windows-msvc
             os: windows
             arch: arm64
             name: nt4_logging.dll
@@ -107,8 +107,17 @@ jobs:
           wget https://github.com/joseluisq/macosx-sdks/releases/download/12.3/MacOSX12.3.sdk.tar.xz
           tar -xf MacOSX12.3.sdk.tar.xz
 
-      - name: Build
-        if: steps.cache-binary.outputs.cache-hit != 'true'
+      - name: Install cargo-xwin
+        if: steps.cache-binary.outputs.cache-hit != 'true' && contains(matrix.os, 'windows')
+        run: cargo install cargo-xwin
+
+      - name: Build Windows
+        if: steps.cache-binary.outputs.cache-hit != 'true' && contains(matrix.os, 'windows')
+        working-directory: nt4_logging
+        run: cargo xwin build --release --target ${{ matrix.target }}
+
+      - name: Build Unix
+        if: steps.cache-binary.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
         working-directory: nt4_logging
         run: |
           if [[ "${{ matrix.target }}" == *"apple"* ]]; then
