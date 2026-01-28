@@ -115,7 +115,6 @@ jobs:
         if: steps.cache-binary.outputs.cache-hit != 'true' && contains(matrix.os, 'windows')
         working-directory: nt4_logging
         run: |
-          export RUSTFLAGS="-C target-feature=+crt-static"
           cargo xwin build --release --target ${{ matrix.target }}
 
       - name: Build Unix

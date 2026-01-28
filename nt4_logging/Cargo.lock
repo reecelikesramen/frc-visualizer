@@ -481,7 +481,7 @@ checksum = "a0f889fb66f7acdf83442c35775764b51fed3c606ab9cee51500dbde2cf528ca"
 
 [[package]]
 name = "nt4_logging"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "byteorder",
  "frclib-core",
