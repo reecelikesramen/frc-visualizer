@@ -47,38 +47,38 @@ layout_mode = 2
 size_flags_vertical = 3
 split_offset = 300
 
-[node name="NTTreeView" parent="HSplitContainer" instance=ExtResource("3_h2yge")]
+[node name="NTTreeView" parent="UIRoot/HSplitContainer" instance=ExtResource("3_h2yge")]
 layout_mode = 2
 
-[node name="RightSide" type="VBoxContainer" parent="HSplitContainer"]
+[node name="RightSide" type="VBoxContainer" parent="UIRoot/HSplitContainer"]
 layout_mode = 2
 
-[node name="TabBar" type="TabBar" parent="HSplitContainer/RightSide"]
+[node name="TabBar" type="TabBar" parent="UIRoot/HSplitContainer/RightSide"]
 layout_mode = 2
 current_tab = 0
 tab_count = 2
 tab_0/title = "3D Field"
 tab_1/title = "2D Field"
 
-[node name="VSplitContainer" type="VSplitContainer" parent="HSplitContainer/RightSide"]
+[node name="VSplitContainer" type="VSplitContainer" parent="UIRoot/HSplitContainer/RightSide"]
 layout_mode = 2
 size_flags_vertical = 3
 split_offset = 400
 
-[node name="ViewContainer" type="MarginContainer" parent="HSplitContainer/RightSide/VSplitContainer"]
+[node name="ViewContainer" type="MarginContainer" parent="UIRoot/HSplitContainer/RightSide/VSplitContainer"]
 layout_mode = 2
 
-[node name="Spacer" type="Control" parent="HSplitContainer/RightSide/VSplitContainer/ViewContainer"]
+[node name="Spacer" type="Control" parent="UIRoot/HSplitContainer/RightSide/VSplitContainer/ViewContainer"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Field2D" type="Control" parent="HSplitContainer/RightSide/VSplitContainer/ViewContainer"]
+[node name="Field2D" type="Control" parent="UIRoot/HSplitContainer/RightSide/VSplitContainer/ViewContainer"]
 visible = false
 layout_mode = 2
 script = ExtResource("4_field2d")
 field_image = ExtResource("6_ycdy4")
 
-[node name="TopicDock" parent="HSplitContainer/RightSide/VSplitContainer" instance=ExtResource("5_topicdock")]
+[node name="TopicDock" parent="UIRoot/HSplitContainer/RightSide/VSplitContainer" instance=ExtResource("5_topicdock")]
 layout_mode = 2
 
 [node name="RobotParent" type="Node3D" parent="."]
