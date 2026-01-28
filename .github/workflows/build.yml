@@ -114,7 +114,9 @@ jobs:
       - name: Build Windows
         if: steps.cache-binary.outputs.cache-hit != 'true' && contains(matrix.os, 'windows')
         working-directory: nt4_logging
-        run: cargo xwin build --release --target ${{ matrix.target }}
+        run: |
+          export RUSTFLAGS="-C target-feature=+crt-static"
+          cargo xwin build --release --target ${{ matrix.target }}
 
       - name: Build Unix
         if: steps.cache-binary.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
@@ -194,14 +196,14 @@ jobs:
           godot --headless --verbose --path godot --export-debug "Windows x86_64" ../build/windows_x86_64/FRC_Visualization_debug.exe
           # Zip the exe and the ENTIRE godot/bin directory structure so the gdextension relative paths work
           cd build/windows_x86_64
-          zip -r ../FRC_Visualization_Windows_x86_64.zip .
+          zip -r ../FRC_Visualization_Windows_x86_64.zip FRC_Visualization.exe
           cd ../..
           cd godot
           zip -r ../build/FRC_Visualization_Windows_x86_64.zip bin/windows/x86_64/nt4_logging.dll
           cd .. 
           
           cd build/windows_x86_64
-          zip -r ../FRC_Visualization_Windows_x86_64_debug.zip FRC_Visualization_debug.exe
+          zip -r ../FRC_Visualization_Windows_x86_64_debug.zip FRC_Visualization_debug.exe FRC_Visualization_debug.console.exe
           cd ../..
           cd godot
           zip -r ../build/FRC_Visualization_Windows_x86_64_debug.zip bin/windows/x86_64/nt4_logging.dll
@@ -214,14 +216,14 @@ jobs:
           godot --headless --verbose --path godot --export-debug "Windows arm64" ../build/windows_arm64/FRC_Visualization_debug.exe
           
           cd build/windows_arm64
-          zip -r ../FRC_Visualization_Windows_arm64.zip .
+          zip -r ../FRC_Visualization_Windows_arm64.zip FRC_Visualization.exe
           cd ../..
           cd godot
           zip -r ../build/FRC_Visualization_Windows_arm64.zip bin/windows/arm64/nt4_logging.dll
           cd ..
           
           cd build/windows_arm64
-          zip -r ../FRC_Visualization_Windows_arm64_debug.zip FRC_Visualization_debug.exe
+          zip -r ../FRC_Visualization_Windows_arm64_debug.zip FRC_Visualization_debug.exe FRC_Visualization_debug.console.exe
           cd ../..
           cd godot
           zip -r ../build/FRC_Visualization_Windows_arm64_debug.zip bin/windows/arm64/nt4_logging.dll
@@ -234,7 +236,7 @@ jobs:
           godot --headless --verbose --path godot --export-debug "Linux x86_64" ../build/linux_x86_64/FRC_Visualization_debug.x86_64
           
           cd build/linux_x86_64
-          zip -r ../FRC_Visualization_Linux_x86_64.zip .
+          zip -r ../FRC_Visualization_Linux_x86_64.zip FRC_Visualization.x86_64
           cd ../..
           cd godot
           zip -r ../build/FRC_Visualization_Linux_x86_64.zip bin/linux/x86_64/libnt4_logging.so
@@ -254,7 +256,7 @@ jobs:
           godot --headless --verbose --path godot --export-debug "Linux arm64" ../build/linux_arm64/FRC_Visualization_debug.arm64
           
           cd build/linux_arm64
-          zip -r ../FRC_Visualization_Linux_arm64.zip .
+          zip -r ../FRC_Visualization_Linux_arm64.zip FRC_Visualization.arm64
           cd ../..
           cd godot
           zip -r ../build/FRC_Visualization_Linux_arm64.zip bin/linux/arm64/libnt4_logging.so
